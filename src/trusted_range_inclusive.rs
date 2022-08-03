@@ -1,0 +1,41 @@
+use prusti_contracts::*;
+use core::ops::RangeInclusive;
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub struct TrustedRangeInclusive {
+    pub(crate) start: usize,
+    pub(crate) end: usize
+}
+
+impl TrustedRangeInclusive {
+    #[requires(start <= end)]
+    #[ensures(result.start == start)]
+    #[ensures(result.end == end)]
+    pub const fn new(start: usize, end: usize) -> Self {
+        Self{start, end}
+    }
+
+    #[pure]
+    pub fn overlap(&self, range2: &Self) -> bool {
+        (self.end > range2.start) || (range2.end > self.start)
+    }
+
+    pub fn to_range_inclusive(self) -> RangeInclusive<usize> {
+        RangeInclusive::new(self.start, self.end)
+    }
+}
+
+
+// #[extern_spec]
+// impl<Idx> RangeInclusive<Idx> {
+//     #[pure]
+//     pub const fn start(&self) -> &Idx;
+
+//     #[pure]
+//     pub const fn end(&self) -> &Idx;
+
+//     // #[ensures(Self::start(result) == start)]
+//     // #[ensures(Self::end(result) == end)]
+//     pub const fn new(start: Idx, end: Idx) -> Self;
+// }
+
