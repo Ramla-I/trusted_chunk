@@ -1,3 +1,6 @@
+//! Most of the List code is taken from the Prusti user guide 
+//! https://viperproject.github.io/prusti-dev/user-guide/tour/summary.html
+
 #[cfg(feature="prusti")]
 use prusti_contracts::*;
 
@@ -42,12 +45,16 @@ impl List {
         self.head.len()
     }
 
+    /// Looks up an element in the list.
+    /// Requires that the index is within range. 
     #[cfg_attr(feature="prusti", pure)]
     #[cfg_attr(feature="prusti", requires(0 <= index && index < self.len()))]
     pub fn lookup(&self, index: usize) -> TrustedRangeInclusive {
         self.head.lookup(index)
     }
 
+    /// Creates an empty list.
+    /// Ensures that the length is zero.
     #[cfg_attr(feature="prusti", ensures(result.len() == 0))]
     pub fn new() -> Self {
         List {
@@ -55,7 +62,11 @@ impl List {
         }
     }
 
-    // #[requires(self.len() < usize::MAX)]
+    /// Adds an element to the list.
+    /// Ensures that:
+    /// * new_length = old_length + 1
+    /// * `elem` is added at index 0
+    /// * all previous elements remain in the list, just moved one index forward
     #[cfg_attr(feature="prusti", ensures(self.len() == old(self.len()) + 1))] 
     #[cfg_attr(feature="prusti", ensures(self.lookup(0) == elem))]
     #[cfg_attr(feature="prusti", ensures(forall(|i: usize| (1 <= i && i < self.len()) ==>
@@ -69,6 +80,14 @@ impl List {
         self.head = Link::More(new_node);
     }
 
+    /// Removes element at index 0 from the list
+    /// Ensures that:
+    /// * if the list is empty, returns None.
+    /// * if the list is not empty, returns Some().
+    /// * if the list is empty, the length remains 0.
+    /// * if the list is not empty, new_length = old_length - 1
+    /// * if the list is not empty, the returned element was previously at index 0
+    /// * if the list is not empty, all elements in the old list at index [1..] are still in the list, except at one index less.
     #[cfg_attr(feature="prusti", ensures(old(self.len()) == 0 ==> result.is_none()))]
     #[cfg_attr(feature="prusti", ensures(old(self.len()) > 0 ==> result.is_some()))]
     #[cfg_attr(feature="prusti", ensures(old(self.len()) == 0 ==> self.len() == 0))]
@@ -89,6 +108,7 @@ impl List {
         }
     }
 
+    /// Returns true if `elem` overlaps with any range in the list that starts at `link`
     #[cfg_attr(feature="prusti", pure)]
     pub(crate) fn overlaps(link: &Link, elem: TrustedRangeInclusive) -> bool {
         let ret = match link {
@@ -104,6 +124,11 @@ impl List {
         ret
     }
 
+    /// Returns the index of the first element in the list which overlaps with `elem`.
+    /// Returns None if there is no overlap.
+    /// 
+    /// # Warning
+    /// Only returns an accurate index if the `link` corresponds to `start_idx`  
     #[cfg_attr(feature="prusti", pure)]
     fn overlap_idx(link: &Link, elem: TrustedRangeInclusive, start_idx: usize) -> Option<usize> {
         let ret = match link {
@@ -119,6 +144,18 @@ impl List {
         ret
     }
 
+    /// Returns the index of the first element in the list which overlaps with `elem`.
+    /// Returns None if there is no overlap.
+    /// 
+    /// Requires that the index lies with in range.
+    /// 
+    /// Ensures that:
+    /// * if the result is Some(idx), then idx lies within the list's length.
+    /// * if the result is Some(idx), then the element at idx overlaps with `elem`
+    /// * if the result is None, then no element in the lists overlaps with `elem`
+    /// 
+    /// # Warning
+    /// Only returns an accurate index if argument `index` is 0
     #[cfg_attr(feature="prusti", pure)]
     #[cfg_attr(feature="prusti", requires(0 <= index && index <= self.len()))]
     #[cfg_attr(feature="prusti", ensures(result.is_some() ==> peek_usize(&result) < self.len()))]

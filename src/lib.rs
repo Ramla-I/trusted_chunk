@@ -113,12 +113,13 @@ impl TrustedChunk {
     /// A trusted function that adds `frames` to the `chunk_list`  and returns true only if
     /// there is no overlap with any range in the list.
     /// 
-    /// Ideally, this function should not be trusted, and instead should be verified with the same postconditions as in push().
+    /// Ideally, this function should not be trusted, and instead should be verified with the same postconditions as in push()
+    /// and range_overlaps_in_list().
     /// Unfortunately, Prusti starts giving errors at this level.
     /// For now, this function is easy to manually inspect and all List functions are formally verified.
     #[cfg_attr(feature="prusti", trusted)]
     fn add_chunk_to_list(frames: TrustedRangeInclusive, chunk_list: &mut List) -> bool {
-        if List::overlaps(&chunk_list.head, frames){
+        if chunk_list.range_overlaps_in_list(frames, 0).is_some(){
             false
         } else {
             chunk_list.push(frames);
