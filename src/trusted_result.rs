@@ -1,6 +1,10 @@
+#[cfg(feature="prusti")]
 use prusti_contracts::*;
-use crate::trusted_range_inclusive::*;
 
+use crate::trusted_range_inclusive::*;
+use crate::*;
+
+#[cfg(feature="prusti")]
 #[extern_spec]
 impl<T,E> core::result::Result<T,E> {
     #[pure]
@@ -15,8 +19,8 @@ impl<T,E> core::result::Result<T,E> {
     // pub fn unwrap(self) -> T;
 }
 
-#[pure]
-#[requires(val.is_ok())]
+#[cfg_attr(feature="prusti", pure)]
+#[cfg_attr(feature="prusti", requires(val.is_ok()))]
 pub(crate) fn peek_usize_range(val: &Result<usize, TrustedRangeInclusive>) -> usize {
     match val {
         Ok(val) => *val,

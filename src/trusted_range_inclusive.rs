@@ -1,4 +1,6 @@
+#[cfg(feature="prusti")]
 use prusti_contracts::*;
+
 use core::ops::RangeInclusive;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -8,19 +10,19 @@ pub struct TrustedRangeInclusive {
 }
 
 impl TrustedRangeInclusive {
-    #[requires(start <= end)]
-    #[ensures(result.start == start)]
-    #[ensures(result.end == end)]
-    pub const fn new(start: usize, end: usize) -> Self {
+    #[cfg_attr(feature="prusti", requires(start <= end))]
+    #[cfg_attr(feature="prusti", ensures(result.start == start))]
+    #[cfg_attr(feature="prusti", ensures(result.end == end))]
+    pub(crate) const fn new(start: usize, end: usize) -> Self {
         Self{start, end}
     }
 
-    #[pure]
-    pub fn overlap(&self, range2: &Self) -> bool {
+    #[cfg_attr(feature="prusti", pure)]
+    pub(crate) fn overlap(&self, range2: &Self) -> bool {
         (self.end > range2.start) || (range2.end > self.start)
     }
 
-    pub fn to_range_inclusive(self) -> RangeInclusive<usize> {
+    pub fn to_range_inclusive(&self) -> RangeInclusive<usize> {
         RangeInclusive::new(self.start, self.end)
     }
 }
