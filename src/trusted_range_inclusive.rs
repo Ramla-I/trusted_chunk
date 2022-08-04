@@ -19,7 +19,9 @@ impl TrustedRangeInclusive {
 
     #[cfg_attr(feature="prusti", pure)]
     pub(crate) fn overlap(&self, range2: &Self) -> bool {
-        (self.end > range2.start) || (range2.end > self.start)
+        ((self.end >= range2.start) && (self.start <= range2.end)) 
+        || 
+        ((range2.end >= self.start) && (range2.start <= self.end))
     }
 
     pub fn to_range_inclusive(&self) -> RangeInclusive<usize> {

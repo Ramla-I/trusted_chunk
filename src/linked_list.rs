@@ -162,13 +162,17 @@ impl List {
     #[cfg_attr(feature="prusti", ensures(result.is_some() ==> {
             let idx = peek_usize(&result);
             let range = self.lookup(idx);
-            (range.end > elem.start) || (elem.end > range.start)
+            ((range.end >= elem.start) && (range.start <= elem.end)) 
+            || 
+            ((elem.end >= range.start) && (elem.start <= range.end))
         }
     ))]
     #[cfg_attr(feature="prusti", ensures(result.is_none() ==> 
         forall(|i: usize| (index <= i && i < self.len()) ==> {
             let range = self.lookup(i);
-            !(range.end > elem.start) && !(elem.end > range.start)
+            !(((range.end >= elem.start) && (range.start <= elem.end)) 
+            || 
+            ((elem.end >= range.start) && (elem.start <= range.end)))
         })
     ))]
     pub(crate) fn range_overlaps_in_list(&self, elem: TrustedRangeInclusive, index: usize) -> Option<usize> {

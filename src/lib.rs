@@ -19,6 +19,7 @@ pub(crate) mod linked_list;
 pub(crate) mod trusted_range_inclusive;
 pub(crate) mod trusted_option;
 pub(crate) mod trusted_result;
+mod test;
 
 /*** Constants taken from kernel_config crate. Only required if CHECK_OVERFLOWS flag is enabled. ***/ 
 /// The lower 12 bits of a virtual address correspond to the P1 page frame offset. 
