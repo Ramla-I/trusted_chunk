@@ -1,4 +1,8 @@
 # trusted_chunk
+## Set up Prusti
+1. Install the VSCode extension for prusti. 
+2. Set the compiler version to correspond with the latest prusti release. (I think I had to do this)
+3. Set the PRUSTI_CHECK_OVERFLOWS flag to false in the vscode prusti settings.
 
 ## Issues
 When trying to write to the static array
@@ -15,7 +19,7 @@ When trying to write to the static array
 }]
 
 
-When trying to iterate thorugh an array using a loop
+When trying to iterate through an array using a loop
 [{
 	"resource": "/home/ramla/static_array_rb_tree/src/static_array.rs",
 	"owner": "prusti",
