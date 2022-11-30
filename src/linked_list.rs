@@ -1,7 +1,7 @@
 //! Most of the List code is taken from the Prusti user guide 
 //! https://viperproject.github.io/prusti-dev/user-guide/tour/summary.html
 
-#[cfg(feature="prusti")]
+// #[cfg(feature="prusti")]
 use prusti_contracts::*;
 
 use crate::{
@@ -27,12 +27,18 @@ pub(crate) struct Node {
     next: Link,
 }
 
-#[cfg_attr(feature="prusti", trusted)]
-#[cfg_attr(feature="prusti", requires(src.is_empty()))]
-#[cfg_attr(feature="prusti", ensures(dest.is_empty()))]
-#[cfg_attr(feature="prusti", ensures(old(dest.len()) == result.len()))]
-#[cfg_attr(feature="prusti", ensures(forall(|i: usize| (0 <= i && i < result.len()) ==> 
-                old(dest.lookup(i)) == result.lookup(i))))] 
+// #[cfg_attr(feature="prusti", trusted)]
+// #[cfg_attr(feature="prusti", requires(src.is_empty()))]
+// #[cfg_attr(feature="prusti", ensures(dest.is_empty()))]
+// #[cfg_attr(feature="prusti", ensures(old(dest.len()) == result.len()))]
+// #[cfg_attr(feature="prusti", ensures(forall(|i: usize| (0 <= i && i < result.len()) ==> 
+//                 old(dest.lookup(i)) == result.lookup(i))))] 
+#[trusted]
+#[requires(src.is_empty())]
+#[ensures(dest.is_empty())]
+#[ensures(old(dest.len()) == result.len())]
+#[ensures(forall(|i: usize| (0 <= i && i < result.len()) ==> 
+                old(dest.lookup(i)) == result.lookup(i)))] 
 fn replace(dest: &mut Link, src: Link) -> Link {
     mem::replace(dest, src)
 }
@@ -40,22 +46,26 @@ fn replace(dest: &mut Link, src: Link) -> Link {
 
 impl List {
 
-    #[cfg_attr(feature="prusti", pure)]
+    // #[cfg_attr(feature="prusti", pure)]
+    #[pure]
     pub fn len(&self) -> usize {
         self.head.len()
     }
 
     /// Looks up an element in the list.
     /// Requires that the index is within range. 
-    #[cfg_attr(feature="prusti", pure)]
-    #[cfg_attr(feature="prusti", requires(0 <= index && index < self.len()))]
+    // #[cfg_attr(feature="prusti", pure)]
+    // #[cfg_attr(feature="prusti", requires(0 <= index && index < self.len()))]
+    #[pure]
+    #[requires(0 <= index && index < self.len())]
     pub fn lookup(&self, index: usize) -> TrustedRangeInclusive {
         self.head.lookup(index)
     }
 
     /// Creates an empty list.
     /// Ensures that the length is zero.
-    #[cfg_attr(feature="prusti", ensures(result.len() == 0))]
+    // #[cfg_attr(feature="prusti", ensures(result.len() == 0))]
+    #[ensures(result.len() == 0)]
     pub fn new() -> Self {
         List {
             head: Link::Empty
@@ -67,10 +77,14 @@ impl List {
     /// * new_length = old_length + 1
     /// * `elem` is added at index 0
     /// * all previous elements remain in the list, just moved one index forward
-    #[cfg_attr(feature="prusti", ensures(self.len() == old(self.len()) + 1))] 
-    #[cfg_attr(feature="prusti", ensures(self.lookup(0) == elem))]
-    #[cfg_attr(feature="prusti", ensures(forall(|i: usize| (1 <= i && i < self.len()) ==>
-        old(self.lookup(i-1)) == self.lookup(i))))]
+    // #[cfg_attr(feature="prusti", ensures(self.len() == old(self.len()) + 1))] 
+    // #[cfg_attr(feature="prusti", ensures(self.lookup(0) == elem))]
+    // #[cfg_attr(feature="prusti", ensures(forall(|i: usize| (1 <= i && i < self.len()) ==>
+    //     old(self.lookup(i-1)) == self.lookup(i))))]
+    #[ensures(self.len() == old(self.len()) + 1)] 
+    #[ensures(self.lookup(0) == elem)]
+    #[ensures(forall(|i: usize| (1 <= i && i < self.len()) ==>
+        old(self.lookup(i-1)) == self.lookup(i)))]
     pub fn push(&mut self, elem: TrustedRangeInclusive) {
         let new_node = Box::new(Node {
             elem: elem,
@@ -88,14 +102,22 @@ impl List {
     /// * if the list is not empty, new_length = old_length - 1
     /// * if the list is not empty, the returned element was previously at index 0
     /// * if the list is not empty, all elements in the old list at index [1..] are still in the list, except at one index less.
-    #[cfg_attr(feature="prusti", ensures(old(self.len()) == 0 ==> result.is_none()))]
-    #[cfg_attr(feature="prusti", ensures(old(self.len()) > 0 ==> result.is_some()))]
-    #[cfg_attr(feature="prusti", ensures(old(self.len()) == 0 ==> self.len() == 0))]
-    #[cfg_attr(feature="prusti", ensures(old(self.len()) > 0 ==> self.len() == old(self.len()-1)))]
-    #[cfg_attr(feature="prusti", ensures(old(self.len()) > 0 ==> peek_range(&result) == old(self.lookup(0))))]
-    #[cfg_attr(feature="prusti", ensures(old(self.len()) > 0 ==>
+    // #[cfg_attr(feature="prusti", ensures(old(self.len()) == 0 ==> result.is_none()))]
+    // #[cfg_attr(feature="prusti", ensures(old(self.len()) > 0 ==> result.is_some()))]
+    // #[cfg_attr(feature="prusti", ensures(old(self.len()) == 0 ==> self.len() == 0))]
+    // #[cfg_attr(feature="prusti", ensures(old(self.len()) > 0 ==> self.len() == old(self.len()-1)))]
+    // #[cfg_attr(feature="prusti", ensures(old(self.len()) > 0 ==> peek_range(&result) == old(self.lookup(0))))]
+    // #[cfg_attr(feature="prusti", ensures(old(self.len()) > 0 ==>
+    // forall(|i: usize| (0 <= i && i < self.len()) ==>
+    //     old(self.lookup(i+1)) == self.lookup(i))))]
+    #[ensures(old(self.len()) == 0 ==> result.is_none())]
+    #[ensures(old(self.len()) > 0 ==> result.is_some())]
+    #[ensures(old(self.len()) == 0 ==> self.len() == 0)]
+    #[ensures(old(self.len()) > 0 ==> self.len() == old(self.len()-1))]
+    #[ensures(old(self.len()) > 0 ==> peek_range(&result) == old(self.lookup(0)))]
+    #[ensures(old(self.len()) > 0 ==>
     forall(|i: usize| (0 <= i && i < self.len()) ==>
-        old(self.lookup(i+1)) == self.lookup(i))))]
+        old(self.lookup(i+1)) == self.lookup(i)))]
     pub fn pop(&mut self) -> Option<TrustedRangeInclusive> {
         match replace(&mut self.head, Link::Empty) {
             Link::Empty => {
@@ -109,7 +131,8 @@ impl List {
     }
 
     /// Returns true if `elem` overlaps with any range in the list that starts at `link`
-    #[cfg_attr(feature="prusti", pure)]
+    // #[cfg_attr(feature="prusti", pure)]
+    #[pure]
     pub(crate) fn overlaps(link: &Link, elem: TrustedRangeInclusive) -> bool {
         let ret = match link {
             Link::Empty => false,
@@ -129,7 +152,8 @@ impl List {
     /// 
     /// # Warning
     /// Only returns an accurate index if the `link` corresponds to `start_idx`  
-    #[cfg_attr(feature="prusti", pure)]
+    // #[cfg_attr(feature="prusti", pure)]
+    #[pure]
     fn overlap_idx(link: &Link, elem: TrustedRangeInclusive, start_idx: usize) -> Option<usize> {
         let ret = match link {
             Link::Empty => None,
@@ -156,25 +180,44 @@ impl List {
     /// 
     /// # Warning
     /// Only returns an accurate index if argument `index` is 0
-    #[cfg_attr(feature="prusti", pure)]
-    #[cfg_attr(feature="prusti", requires(0 <= index && index <= self.len()))]
-    #[cfg_attr(feature="prusti", ensures(result.is_some() ==> peek_usize(&result) < self.len()))]
-    #[cfg_attr(feature="prusti", ensures(result.is_some() ==> {
+    // #[cfg_attr(feature="prusti", pure)]
+    // #[cfg_attr(feature="prusti", requires(0 <= index && index <= self.len()))]
+    // #[cfg_attr(feature="prusti", ensures(result.is_some() ==> peek_usize(&result) < self.len()))]
+    // #[cfg_attr(feature="prusti", ensures(result.is_some() ==> {
+    //         let idx = peek_usize(&result);
+    //         let range = self.lookup(idx);
+    //         ((range.end >= elem.start) && (range.start <= elem.end)) 
+    //         || 
+    //         ((elem.end >= range.start) && (elem.start <= range.end))
+    //     }
+    // ))]
+    // #[cfg_attr(feature="prusti", ensures(result.is_none() ==> 
+    //     forall(|i: usize| (index <= i && i < self.len()) ==> {
+    //         let range = self.lookup(i);
+    //         !(((range.end >= elem.start) && (range.start <= elem.end)) 
+    //         || 
+    //         ((elem.end >= range.start) && (elem.start <= range.end)))
+    //     })
+    // ))]
+    #[pure]
+    #[requires(0 <= index && index <= self.len())]
+    #[ensures(result.is_some() ==> peek_usize(&result) < self.len())]
+    #[ensures(result.is_some() ==> {
             let idx = peek_usize(&result);
             let range = self.lookup(idx);
             ((range.end >= elem.start) && (range.start <= elem.end)) 
             || 
             ((elem.end >= range.start) && (elem.start <= range.end))
         }
-    ))]
-    #[cfg_attr(feature="prusti", ensures(result.is_none() ==> 
+    )]
+    #[ensures(result.is_none() ==> 
         forall(|i: usize| (index <= i && i < self.len()) ==> {
             let range = self.lookup(i);
             !(((range.end >= elem.start) && (range.start <= elem.end)) 
             || 
             ((elem.end >= range.start) && (elem.start <= range.end)))
         })
-    ))]
+    )]
     pub(crate) fn range_overlaps_in_list(&self, elem: TrustedRangeInclusive, index: usize) -> Option<usize> {
         if index >= self.len() {
             return None;
@@ -190,9 +233,12 @@ impl List {
 
 impl Link {
 
-    #[cfg_attr(feature="prusti", pure)]
-    #[cfg_attr(feature="prusti", ensures(self.is_empty() ==> result == 0))]
-    #[cfg_attr(feature="prusti", ensures(!self.is_empty() ==> result > 0))]
+    // #[cfg_attr(feature="prusti", pure)]
+    // #[cfg_attr(feature="prusti", ensures(self.is_empty() ==> result == 0))]
+    // #[cfg_attr(feature="prusti", ensures(!self.is_empty() ==> result > 0))]
+    #[pure]
+    #[ensures(self.is_empty() ==> result == 0)]
+    #[ensures(!self.is_empty() ==> result > 0)]
     fn len(&self) -> usize {
         match self {
             Link::Empty => 0,
@@ -200,7 +246,8 @@ impl Link {
         }
     }
 
-    #[cfg_attr(feature="prusti", pure)]
+    // #[cfg_attr(feature="prusti", pure)]
+    #[pure]
     fn is_empty(&self) -> bool {
         match self {
             Link::Empty => true,
@@ -208,8 +255,10 @@ impl Link {
         }
     }
 
-    #[cfg_attr(feature="prusti", pure)]
-    #[cfg_attr(feature="prusti", requires(0 <= index && index < self.len()))]
+    // #[cfg_attr(feature="prusti", pure)]
+    // #[cfg_attr(feature="prusti", requires(0 <= index && index < self.len()))]
+    #[pure]
+    #[requires(0 <= index && index < self.len())]
     pub fn lookup(&self, index: usize) -> TrustedRangeInclusive {
         match self {
             Link::Empty => unreachable!(),

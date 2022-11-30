@@ -1,10 +1,10 @@
-#[cfg(feature="prusti")]
+// #[cfg(feature="prusti")]
 use prusti_contracts::*;
 
 use crate::trusted_range_inclusive::*;
 use crate::TrustedChunk;
 
-#[cfg(feature="prusti")]
+// #[cfg(feature="prusti")]
 #[extern_spec]
 impl<T> core::option::Option<T> {
     #[pure]
@@ -19,8 +19,10 @@ impl<T> core::option::Option<T> {
     pub fn unwrap(self) -> T;
 }
 
-#[cfg_attr(feature="prusti", pure)]
-#[cfg_attr(feature="prusti", requires(val.is_some()))]
+// #[cfg_attr(feature="prusti", pure)]
+// #[cfg_attr(feature="prusti", requires(val.is_some()))]
+#[pure]
+#[requires(val.is_some())]
 pub(crate) fn peek_range(val: &Option<TrustedRangeInclusive>) -> TrustedRangeInclusive {
     match val {
         Some(val) => *val,
@@ -28,8 +30,10 @@ pub(crate) fn peek_range(val: &Option<TrustedRangeInclusive>) -> TrustedRangeInc
     }
 }
 
-#[cfg_attr(feature="prusti", pure)]
-#[cfg_attr(feature="prusti", requires(val.is_some()))]
+// #[cfg_attr(feature="prusti", pure)]
+// #[cfg_attr(feature="prusti", requires(val.is_some()))]
+#[pure]
+#[requires(val.is_some())]
 pub(crate) fn peek_usize(val: &Option<usize>) -> usize {
     match val {
         Some(val) => *val,
@@ -37,8 +41,10 @@ pub(crate) fn peek_usize(val: &Option<usize>) -> usize {
     }
 }
 
-#[cfg_attr(feature="prusti", pure)]
-#[cfg_attr(feature="prusti", requires(val.is_some()))]
+// #[cfg_attr(feature="prusti", pure)]
+// #[cfg_attr(feature="prusti", requires(val.is_some()))]
+#[pure]
+#[requires(val.is_some())]
 pub(crate) fn peek_chunk(val: &Option<TrustedChunk>) -> &TrustedChunk {
     match val {
         Some(val) => val,

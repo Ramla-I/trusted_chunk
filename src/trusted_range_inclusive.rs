@@ -1,4 +1,4 @@
-#[cfg(feature="prusti")]
+// #[cfg(feature="prusti")]
 use prusti_contracts::*;
 
 use core::ops::RangeInclusive;
@@ -10,14 +10,18 @@ pub struct TrustedRangeInclusive {
 }
 
 impl TrustedRangeInclusive {
-    #[cfg_attr(feature="prusti", requires(start <= end))]
-    #[cfg_attr(feature="prusti", ensures(result.start == start))]
-    #[cfg_attr(feature="prusti", ensures(result.end == end))]
+    // #[cfg_attr(feature="prusti", requires(start <= end))]
+    // #[cfg_attr(feature="prusti", ensures(result.start == start))]
+    // #[cfg_attr(feature="prusti", ensures(result.end == end))]
+    #[requires(start <= end)]
+    #[ensures(result.start == start)]
+    #[ensures(result.end == end)]
     pub(crate) const fn new(start: usize, end: usize) -> Self {
         Self{start, end}
     }
 
-    #[cfg_attr(feature="prusti", pure)]
+    // #[cfg_attr(feature="prusti", pure)]
+    #[pure]
     pub(crate) fn overlap(&self, range2: &Self) -> bool {
         ((self.end >= range2.start) && (self.start <= range2.end)) 
         || 
