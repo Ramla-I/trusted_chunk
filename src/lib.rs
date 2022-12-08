@@ -129,7 +129,12 @@ impl TrustedChunk {
     /// Unfortunately, Prusti starts giving errors at this level.
     /// For now, this function is easy to manually inspect and all List functions are formally verified.
     // #[cfg_attr(feature="prusti", trusted)]
-    #[trusted]
+    // #[trusted]
+    #[ensures(result ==> chunk_list.len() == old(chunk_list.len()) + 1)] 
+    #[ensures(result ==> chunk_list.lookup(0) == frames)]
+    #[ensures(result ==> forall(|i: usize| (1 <= i && i < chunk_list.len()) ==> old(chunk_list.lookup(i-1)) == chunk_list.lookup(i)))]
+    #[ensures(!result ==> chunk_list.len() == old(chunk_list.len()))] 
+    #[ensures(!result ==> forall(|i: usize| (1 <= i && i < chunk_list.len()) ==> old(chunk_list.lookup(i)) == chunk_list.lookup(i)))]
     fn add_chunk_to_list(frames: TrustedRangeInclusive, chunk_list: &mut List) -> bool {
         if chunk_list.range_overlaps_in_list(frames, 0).is_some(){
             false
