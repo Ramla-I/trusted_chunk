@@ -51,14 +51,18 @@ impl<T: Copy + PartialEq + UniqueCheck> StaticArray<T> {
     )]
     #[ensures(result.is_ok() ==> {
         let idx = peek_result(&result);
-        self.arr[idx] == Some(value)
+        self.arr[idx].is_some()
+    })]
+    #[ensures(result.is_ok() ==> {
+        let idx = peek_result(&result);
+        let val = peek_option(&self.arr[idx]);
+        val == value
     })]
     #[ensures(result.is_ok() ==> 
         forall(|i: usize| ((0 <= i && i < 32) && (i != peek_result(&result))) ==> old(self.arr[i]) == self.arr[i])
     )] 
 	pub fn push(&mut self, value: T) -> Result<usize, T> {
         let mut i = 0;
-        // let a = TrustedRangeInclusive::new(0,0);
 
         while i < 32 {
             body_invariant!(i < self.arr.len());
@@ -90,12 +94,12 @@ impl<T: Copy + PartialEq + UniqueCheck> StaticArray<T> {
     //     })
     // ))]
 
-    #[pure]
+    // #[pure]
     #[requires(0 <= index && index <= 32)]
-    #[ensures(result.is_some() ==> peek_usize(&result) < 32)]
-    #[ensures(result.is_some() ==> self.arr[peek_usize(&result)].is_some())]
+    #[ensures(result.is_some() ==> peek_option(&result) < 32)]
+    #[ensures(result.is_some() ==> self.arr[peek_option(&result)].is_some())]
     #[ensures(result.is_some() ==> {
-            let idx = peek_usize(&result);
+            let idx = peek_option(&result);
             let range = peek_option(&self.arr[idx]);
             range.overlaps_with(&elem)
         }

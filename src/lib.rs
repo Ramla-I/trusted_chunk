@@ -23,7 +23,7 @@ pub(crate) mod trusted_option;
 pub(crate) mod trusted_result;
 mod test;
 mod static_array;
-// mod static_array_linked_list;
+mod static_array_linked_list;
 
 /*** Constants taken from kernel_config crate. Only required if CHECK_OVERFLOWS flag is enabled. ***/ 
 /// The lower 12 bits of a virtual address correspond to the P1 page frame offset. 
