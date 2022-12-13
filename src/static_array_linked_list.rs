@@ -125,42 +125,42 @@ impl StaticArrayLinkedList {
 	}
 
 
-	// /// Converts the contained collection from a primitive array into a LinkedList.
-	// /// If the contained collection is already using heap allocation, this is a no-op.
-	// /// 
-	// /// Call this function once heap allocation is available. 
-	// #[ensures(old(self.is_array()) ==> self.is_linked_list())]
-	// #[ensures(old(self.is_linked_list()) ==> self.is_linked_list())]
-	// #[ensures(old(self.is_linked_list()) ==> self.peek_linked_list().len() == old(self.peek_linked_list().len()))]
-	// #[ensures(old(self.is_linked_list()) ==> forall(|i: usize| (0 <= i && i < self.peek_linked_list().len()) 
-	// 	==> self.peek_linked_list().lookup(i) == old(self.peek_linked_list().lookup(i)) 
-	// ))]
+	/// Converts the contained collection from a primitive array into a LinkedList.
+	/// If the contained collection is already using heap allocation, this is a no-op.
+	/// 
+	/// Call this function once heap allocation is available. 
+	#[ensures(old(self.is_array()) ==> self.is_linked_list())]
+	#[ensures(old(self.is_linked_list()) ==> self.is_linked_list())]
+	#[ensures(old(self.is_linked_list()) ==> self.peek_linked_list().len() == old(self.peek_linked_list().len()))]
+	#[ensures(old(self.is_linked_list()) ==> forall(|i: usize| (0 <= i && i < self.peek_linked_list().len()) 
+		==> self.peek_linked_list().lookup(i) == old(self.peek_linked_list().lookup(i)) 
+	))]
 	// #[ensures(old(self.is_array()) ==> self.peek_linked_list().len() <= old(self.peek_array().len()))]
-	// // #[ensures(old(self.is_array()) ==> 
-	// // 	forall(|i: usize| (0 <= i && i < self.peek_linked_list().len()) ==> 
-	// // 		old(self.peek_array().lookup(i).is_some()) ==>
-	// // 			self.peek_linked_list().lookup(i) == old(peek_range(&self.peek_array().lookup(i)))
-	// // ))]
-	// pub fn convert_to_heap_allocated(&mut self) {
-	// 	let new_ll = match self {
-	// 		StaticArrayLinkedList::Array(sa) => {
-	// 			let mut ll = List::new();
-	// 			let mut i = 0;
-	// 			while i < sa.len() {
-	// 				body_invariant!(i < sa.len());
-	// 				body_invariant!(i >= 0);
-	// 				if let Some(e) = sa.arr[i] {
-	// 					ll.push(e);
-	// 				}
-	// 				i += 1;
-	// 			}
-	// 			assert!(ll.len() <= sa.len());
-	// 			ll
-	// 		}
-	// 		StaticArrayLinkedList::LinkedList(_ll) => return,
-	// 	};
-	// 	*self = StaticArrayLinkedList::LinkedList(new_ll);
-	// }
+	// #[ensures(old(self.is_array()) ==> 
+	// 	forall(|i: usize| (0 <= i && i < self.peek_linked_list().len()) ==> 
+	// 		old(self.peek_array().lookup(i).is_some()) ==>
+	// 			self.peek_linked_list().lookup(i) == old(peek_range(&self.peek_array().lookup(i)))
+	// ))]
+	pub fn convert_to_heap_allocated(&mut self) {
+		let new_ll = match self {
+			StaticArrayLinkedList::Array(sa) => {
+				let mut ll = List::new();
+				let mut i = 0;
+				while i < sa.len() {
+					body_invariant!(i < sa.len());
+					body_invariant!(i >= 0);
+					if let Some(e) = sa.arr[i] {
+						ll.push(e);
+					}
+					i += 1;
+				}
+				// assert!(ll.len() <= sa.len());
+				ll
+			}
+			StaticArrayLinkedList::LinkedList(_ll) => return,
+		};
+		*self = StaticArrayLinkedList::LinkedList(new_ll);
+	}
 
 	// pub(crate) fn range_overlaps(&self, elem: TrustedRangeInclusive) -> bool {
 	// 	let result = match self{

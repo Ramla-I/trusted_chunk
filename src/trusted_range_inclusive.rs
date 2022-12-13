@@ -20,6 +20,7 @@ impl TrustedRangeInclusive {
         Self{start, end}
     }
 
+    /// SPEC FUNCTION
     // #[cfg_attr(feature="prusti", pure)]
     #[pure]
     pub(crate) fn overlap(&self, range2: &Self) -> bool {
@@ -32,18 +33,4 @@ impl TrustedRangeInclusive {
         RangeInclusive::new(self.start, self.end)
     }
 }
-
-
-// #[extern_spec]
-// impl<Idx> RangeInclusive<Idx> {
-//     #[pure]
-//     pub const fn start(&self) -> &Idx;
-
-//     #[pure]
-//     pub const fn end(&self) -> &Idx;
-
-//     // #[ensures(Self::start(result) == start)]
-//     // #[ensures(Self::end(result) == end)]
-//     pub const fn new(start: Idx, end: Idx) -> Self;
-// }
 

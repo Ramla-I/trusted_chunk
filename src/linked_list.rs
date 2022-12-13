@@ -6,26 +6,38 @@ use prusti_contracts::*;
 
 use crate::{
     trusted_option::*,
-    trusted_range_inclusive::*
+    unique_check::*
 };
 use core::{
     mem,
+    marker::Copy,
+    ops::Deref
 };
 
 
-pub struct List {
-    pub(crate) head: Link,
+pub struct List<T: Copy + PartialEq + UniqueCheck> {
+    pub(crate) head: Link<T>,
 }
 
-pub(crate) enum Link {
+pub(crate) enum Link<T: Copy + PartialEq + UniqueCheck> {
     Empty,
-    More(Box<Node>),
+    More(Box<Node<T>>)
 }
 
-pub(crate) struct Node {
-    elem: TrustedRangeInclusive,
-    next: Link,
+pub(crate) struct Node<T: Copy + PartialEq + UniqueCheck> {
+    elem: T,
+    next: Link<T>,
 }
+
+// pub(crate) enum Link {
+//     Empty,
+//     More(Box<Node>),
+// }
+
+// pub(crate) struct Node {
+//     elem: TrustedRangeInclusive,
+//     next: Link,
+// }
 
 // #[cfg_attr(feature="prusti", trusted)]
 // #[cfg_attr(feature="prusti", requires(src.is_empty()))]
@@ -39,12 +51,12 @@ pub(crate) struct Node {
 #[ensures(old(dest.len()) == result.len())]
 #[ensures(forall(|i: usize| (0 <= i && i < result.len()) ==> 
                 old(dest.lookup(i)) == result.lookup(i)))] 
-fn replace(dest: &mut Link, src: Link) -> Link {
+fn replace<T: Copy + PartialEq + UniqueCheck>(dest: &mut Link<T>, src: Link<T>) -> Link<T> {
     mem::replace(dest, src)
 }
 
 
-impl List {
+impl<T: Copy + PartialEq + UniqueCheck> List<T> {
 
     // #[cfg_attr(feature="prusti", pure)]
     #[pure]
@@ -58,7 +70,7 @@ impl List {
     // #[cfg_attr(feature="prusti", requires(0 <= index && index < self.len()))]
     #[pure]
     #[requires(0 <= index && index < self.len())]
-    pub fn lookup(&self, index: usize) -> TrustedRangeInclusive {
+    pub fn lookup(&self, index: usize) -> T {
         self.head.lookup(index)
     }
 
@@ -67,9 +79,7 @@ impl List {
     // #[cfg_attr(feature="prusti", ensures(result.len() == 0))]
     #[ensures(result.len() == 0)]
     pub fn new() -> Self {
-        List {
-            head: Link::Empty
-        }
+        List { head: Link::Empty }
     }
 
     /// Adds an element to the list.
@@ -83,12 +93,11 @@ impl List {
     //     old(self.lookup(i-1)) == self.lookup(i))))]
     #[ensures(self.len() == old(self.len()) + 1)] 
     #[ensures(self.lookup(0) == elem)]
-    #[ensures(forall(|i: usize| (1 <= i && i < self.len()) ==>
-        old(self.lookup(i-1)) == self.lookup(i)))]
-    pub fn push(&mut self, elem: TrustedRangeInclusive) {
+    #[ensures(forall(|i: usize| (1 <= i && i < self.len()) ==> old(self.lookup(i-1)) == self.lookup(i)))]
+    pub fn push(&mut self, elem: T) {
         let new_node = Box::new(Node {
             elem: elem,
-            next: replace(&mut self.head, Link::Empty),
+            next: replace(&mut self.head, Link::Empty)
         });
 
         self.head = Link::More(new_node);
@@ -114,11 +123,11 @@ impl List {
     #[ensures(old(self.len()) > 0 ==> result.is_some())]
     #[ensures(old(self.len()) == 0 ==> self.len() == 0)]
     #[ensures(old(self.len()) > 0 ==> self.len() == old(self.len()-1))]
-    #[ensures(old(self.len()) > 0 ==> peek_range(&result) == old(self.lookup(0)))]
+    #[ensures(old(self.len()) > 0 ==> peek_option(&result) == old(self.lookup(0)))]
     #[ensures(old(self.len()) > 0 ==>
-    forall(|i: usize| (0 <= i && i < self.len()) ==>
-        old(self.lookup(i+1)) == self.lookup(i)))]
-    pub fn pop(&mut self) -> Option<TrustedRangeInclusive> {
+        forall(|i: usize| (0 <= i && i < self.len()) ==> old(self.lookup(i+1)) == self.lookup(i))
+    )]
+    pub fn pop(&mut self) -> Option<T> {
         match replace(&mut self.head, Link::Empty) {
             Link::Empty => {
                 None
@@ -130,43 +139,25 @@ impl List {
         }
     }
 
-    /// Returns true if `elem` overlaps with any range in the list that starts at `link`
-    // #[cfg_attr(feature="prusti", pure)]
-    #[pure]
-    pub(crate) fn overlaps(link: &Link, elem: TrustedRangeInclusive) -> bool {
-        let ret = match link {
-            Link::Empty => false,
-            Link::More(box node) => {
-                if node.elem.overlap(&elem) {
-                    true
-                } else {
-                    false || Self::overlaps(&node.next, elem)
-                }
-            }
-        };
-        ret
-    }
 
-    /// Returns the index of the first element in the list which overlaps with `elem`.
-    /// Returns None if there is no overlap.
-    /// 
-    /// # Warning
-    /// Only returns an accurate index if the `link` corresponds to `start_idx`  
-    // #[cfg_attr(feature="prusti", pure)]
-    #[pure]
-    fn overlap_idx(link: &Link, elem: TrustedRangeInclusive, start_idx: usize) -> Option<usize> {
-        let ret = match link {
-            Link::Empty => None,
-            Link::More(box node) => {
-                if node.elem.overlap(&elem) {
-                    Some(start_idx)
-                } else {
-                    Self::overlap_idx(&node.next, elem, start_idx + 1)
-                }
-            }
-        };
-        ret
-    }
+    // /// Returns true if `elem` overlaps with any range in the list that starts at `link`
+    // // #[cfg_attr(feature="prusti", pure)]
+    // #[pure]
+    // pub(crate) fn overlaps(link: &Link<T>, elem: T) -> bool {
+    //     let ret = match link {
+    //         Link::Empty => false,
+    //         Link::More(box node) => {
+    //             if node.elem.overlaps_with(&elem) {
+    //                 true
+    //             } else {
+    //                 false || Self::overlaps(&node.next, elem)
+    //             }
+    //         }
+    //     };
+    //     ret
+    // }
+
+
 
     /// Returns the index of the first element in the list which overlaps with `elem`.
     /// Returns None if there is no overlap.
@@ -201,37 +192,34 @@ impl List {
     // ))]
     #[pure]
     #[requires(0 <= index && index <= self.len())]
-    #[ensures(result.is_some() ==> peek_usize(&result) < self.len())]
+    #[ensures(result.is_some() ==> peek_option(&result) < self.len())]
     #[ensures(result.is_some() ==> {
-            let idx = peek_usize(&result);
+            let idx = peek_option(&result);
             let range = self.lookup(idx);
-            ((range.end >= elem.start) && (range.start <= elem.end)) 
-            || 
-            ((elem.end >= range.start) && (elem.start <= range.end))
+            range.overlaps_with(&elem)
         }
     )]
     #[ensures(result.is_none() ==> 
         forall(|i: usize| (index <= i && i < self.len()) ==> {
             let range = self.lookup(i);
-            !(((range.end >= elem.start) && (range.start <= elem.end)) 
-            || 
-            ((elem.end >= range.start) && (elem.start <= range.end)))
+            !range.overlaps_with(&elem)
         })
     )]
-    pub(crate) fn range_overlaps_in_list(&self, elem: TrustedRangeInclusive, index: usize) -> Option<usize> {
+    pub(crate) fn range_overlaps_in_list(&self, elem: T, index: usize) -> Option<usize> {
         if index >= self.len() {
             return None;
         }
-        let ret = if self.lookup(index).overlap(&elem) {
+        let ret = if self.lookup(index).overlaps_with(&elem) {
             Some(index)
         } else {
             self.range_overlaps_in_list(elem, index + 1)
         };
         ret
     }
+
 }
 
-impl Link {
+impl<T: Copy + PartialEq + UniqueCheck> Link<T> {
 
     // #[cfg_attr(feature="prusti", pure)]
     // #[cfg_attr(feature="prusti", ensures(self.is_empty() ==> result == 0))]
@@ -259,7 +247,7 @@ impl Link {
     // #[cfg_attr(feature="prusti", requires(0 <= index && index < self.len()))]
     #[pure]
     #[requires(0 <= index && index < self.len())]
-    pub fn lookup(&self, index: usize) -> TrustedRangeInclusive {
+    pub fn lookup(&self, index: usize) -> T {
         match self {
             Link::Empty => unreachable!(),
             Link::More(box node) => {
