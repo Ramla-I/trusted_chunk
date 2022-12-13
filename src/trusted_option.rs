@@ -19,23 +19,23 @@ impl<T> core::option::Option<T> {
     pub fn unwrap(self) -> T;
 }
 
-// #[extern_spec]
-// impl<T: Copy + PartialEq> PartialEq for core::option::Option<T> {
-//     #[pure]
-//     #[ensures(self.is_none() && other.is_none() ==> true)]
-//     #[ensures(self.is_none() && other.is_some() ==> false)]
-//     #[ensures(self.is_some() && other.is_none() ==> false)]
-//     #[ensures(self.is_some() && other.is_some() ==> {
-//         let val1 = peek_option(&self);
-//         let val2 = peek_option(&other);
-//         val1 == val2
-//     })]
-    // fn eq(&self, other:&Self) -> bool;
+#[extern_spec]
+impl<T: Copy + PartialEq> PartialEq for core::option::Option<T> {
+    #[pure]
+    #[ensures(self.is_none() && other.is_none() ==> result == true)]
+    #[ensures(self.is_none() && other.is_some() ==> result == false)]
+    #[ensures(self.is_some() && other.is_none() ==> result == false)]
+    #[ensures(self.is_some() && other.is_some() ==> {
+        let val1 = peek_option(&self);
+        let val2 = peek_option(&other);
+        result == (val1 == val2)
+    })]
+    fn eq(&self, other:&Self) -> bool;
 
-//     // #[pure]
-//     // #[ensures(result == !self.eq(other))]
-//     // fn ne(&self, other:&Self) -> bool;
-// }
+    // #[pure]
+    // #[ensures(result == !self.eq(other))]
+    // fn ne(&self, other:&Self) -> bool;
+}
 
 // #[cfg_attr(feature="prusti", pure)]
 // #[cfg_attr(feature="prusti", requires(val.is_some()))]
