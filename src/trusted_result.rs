@@ -25,3 +25,12 @@ pub(crate) fn peek_result<T: Copy, E>(val: &Result<T,E>) -> T {
         Err(_) => unreachable!(),
     }
 }
+
+#[pure]
+#[requires(val.is_err())]
+pub(crate) fn peek_err<T, E: Copy>(val: &Result<T,E>) -> E {
+    match val {
+        Ok(_) => unreachable!(),
+        Err(e) => *e,
+    }
+}

@@ -6,7 +6,8 @@ use prusti_contracts::*;
 
 use crate::{
     trusted_option::*,
-    unique_check::*
+    unique_check::*,
+    trusted_result::*
 };
 use core::{
     mem,
@@ -101,6 +102,65 @@ impl<T: Copy + PartialEq + UniqueCheck> List<T> {
         });
 
         self.head = Link::More(new_node);
+    }
+
+    #[ensures(result.is_err() ==> peek_err(&result) < self.len())]
+    #[ensures(result.is_err() ==> {
+            let idx = peek_err(&result);
+            let range = self.lookup(idx);
+            range.overlaps_with(&elem)
+        }
+    )]
+    #[ensures(result.is_ok() ==> self.len() == old(self.len()) + 1)] 
+    #[ensures(result.is_ok() ==> self.lookup(0) == elem)]
+    #[ensures(result.is_ok() ==> forall(|i: usize| (1 <= i && i < self.len()) ==> old(self.lookup(i-1)) == self.lookup(i)))]
+    #[ensures(result.is_ok() ==> 
+        forall(|i: usize| (1 <= i && i < self.len()) ==> {
+            let range = self.lookup(i);
+            !range.overlaps_with(&elem)
+        })
+    )]
+    pub fn push_unique(&mut self, elem: T) -> Result<(),usize> {
+        match self.elem_overlaps_in_list(elem, 0) {
+            Some(idx) => Err(idx),
+            None => {
+                let new_node = Box::new(Node {
+                    elem: elem,
+                    next: replace(&mut self.head, Link::Empty)
+                });
+                self.head = Link::More(new_node);
+                Ok(())
+            }
+        }
+    }
+
+    #[requires(forall(|i: usize, j: usize| (0 <= i && i < self.len() && 0 <= j && j < self.len()) ==> 
+        (i != j ==> !self.lookup(i).overlaps_with(&self.lookup(j))))
+    )]
+    #[ensures(result.is_ok() ==> self.len() == old(self.len()) + 1)] 
+    #[ensures(result.is_ok() ==> self.lookup(0) == elem)]
+    #[ensures(result.is_ok() ==> forall(|i: usize| (1 <= i && i < self.len()) ==> old(self.lookup(i-1)) == self.lookup(i)))]
+    // #[ensures(result.is_ok() ==> 
+    //     forall(|i: usize| (1 <= i && i < self.len()) ==> {
+    //         let range = self.lookup(i);
+    //         !range.overlaps_with(&elem)
+    //     })
+    // )]
+    #[ensures(forall(|i: usize, j: usize| (0 <= i && i < self.len() && 0 <= j && j < self.len()) ==> 
+        (i != j ==> !self.lookup(i).overlaps_with(&self.lookup(j))))
+    )]
+    pub fn push_unique2(&mut self, elem: T) -> Result<(),usize> {
+        match self.elem_overlaps_in_list(elem, 0) {
+            Some(idx) => Err(idx),
+            None => {
+                let new_node = Box::new(Node {
+                    elem: elem,
+                    next: replace(&mut self.head, Link::Empty)
+                });
+                self.head = Link::More(new_node);
+                Ok(())
+            }
+        }
     }
 
     /// Removes element at index 0 from the list
@@ -205,14 +265,14 @@ impl<T: Copy + PartialEq + UniqueCheck> List<T> {
             !range.overlaps_with(&elem)
         })
     )]
-    pub(crate) fn range_overlaps_in_list(&self, elem: T, index: usize) -> Option<usize> {
+    pub(crate) fn elem_overlaps_in_list(&self, elem: T, index: usize) -> Option<usize> {
         if index >= self.len() {
             return None;
         }
         let ret = if self.lookup(index).overlaps_with(&elem) {
             Some(index)
         } else {
-            self.range_overlaps_in_list(elem, index + 1)
+            self.elem_overlaps_in_list(elem, index + 1)
         };
         ret
     }

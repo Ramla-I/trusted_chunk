@@ -77,6 +77,7 @@ impl<T: Copy + PartialEq + UniqueCheck> StaticArray<T> {
         return Err(value);
 	}
 
+
     // #[cfg_attr(feature="prusti", pure)]
     // #[cfg_attr(feature="prusti", requires(0 <= index && index < self.arr.len()))]
     // #[cfg_attr(feature="prusti", ensures(result.is_some() ==> peek_usize(&result) < 32))]
@@ -110,7 +111,7 @@ impl<T: Copy + PartialEq + UniqueCheck> StaticArray<T> {
             !range.overlaps_with(&elem)
         })
     )]
-    pub(crate) fn range_overlaps_in_array(&self, elem: T, index: usize) -> Option<usize> {
+    pub(crate) fn elem_overlaps_in_array(&self, elem: T, index: usize) -> Option<usize> {
         if index >= 32 {
             return None;
         }
@@ -120,11 +121,11 @@ impl<T: Copy + PartialEq + UniqueCheck> StaticArray<T> {
                 if val.overlaps_with(&elem) {
                     Some(index)
                 } else {
-                    self.range_overlaps_in_array(elem, index + 1)
+                    self.elem_overlaps_in_array(elem, index + 1)
                 }
             },
             None => {
-                self.range_overlaps_in_array(elem, index + 1)
+                self.elem_overlaps_in_array(elem, index + 1)
             }
         };
         ret
