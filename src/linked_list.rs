@@ -250,7 +250,7 @@ impl<T: Copy + PartialEq + UniqueCheck> List<T> {
     //         ((elem.end >= range.start) && (elem.start <= range.end)))
     //     })
     // ))]
-    #[pure]
+    // #[pure]
     #[requires(0 <= index && index <= self.len())]
     #[ensures(result.is_some() ==> peek_option(&result) < self.len())]
     #[ensures(result.is_some() ==> {

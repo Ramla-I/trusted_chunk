@@ -3,6 +3,8 @@ use prusti_contracts::*;
 
 use core::ops::RangeInclusive;
 
+use crate::unique_check::*;
+
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct TrustedRangeInclusive {
     pub(crate) start: usize,
@@ -32,5 +34,18 @@ impl TrustedRangeInclusive {
     pub fn to_range_inclusive(&self) -> RangeInclusive<usize> {
         RangeInclusive::new(self.start, self.end)
     }
+}
+
+impl UniqueCheck for TrustedRangeInclusive {
+    #[trusted]
+    #[pure]
+    // #[ensures(result ==> other.overlaps_with(&self))]
+    fn overlaps_with(&self, other: &Self) -> bool {
+        // ((self.end >= other.start) && (self.start <= other.end)) 
+        // || 
+        // ((other.end >= self.start) && (other.start <= self.end))
+        true
+    }
+
 }
 
