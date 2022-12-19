@@ -7,7 +7,8 @@ use prusti_contracts::*;
 use crate::{
     trusted_option::*,
     unique_check::*,
-    trusted_result::*
+    trusted_result::*,
+    trusted_range_inclusive::*
 };
 use core::{
     mem,
@@ -16,29 +17,20 @@ use core::{
 };
 
 
-pub struct List<T: Copy + PartialEq + UniqueCheck> {
-    pub(crate) head: Link<T>,
+pub struct List {
+    pub(crate) head: Link,
 }
 
-pub(crate) enum Link<T: Copy + PartialEq + UniqueCheck> {
+pub(crate) enum Link {
     Empty,
-    More(Box<Node<T>>)
+    More(Box<Node>)
 }
 
-pub(crate) struct Node<T: Copy + PartialEq + UniqueCheck> {
-    elem: T,
-    next: Link<T>,
+pub(crate) struct Node {
+    elem: TrustedRangeInclusive,
+    next: Link,
 }
 
-// pub(crate) enum Link {
-//     Empty,
-//     More(Box<Node>),
-// }
-
-// pub(crate) struct Node {
-//     elem: TrustedRangeInclusive,
-//     next: Link,
-// }
 
 // #[cfg_attr(feature="prusti", trusted)]
 // #[cfg_attr(feature="prusti", requires(src.is_empty()))]
@@ -52,12 +44,12 @@ pub(crate) struct Node<T: Copy + PartialEq + UniqueCheck> {
 #[ensures(old(dest.len()) == result.len())]
 #[ensures(forall(|i: usize| (0 <= i && i < result.len()) ==> 
                 old(dest.lookup(i)) == result.lookup(i)))] 
-fn replace<T: Copy + PartialEq + UniqueCheck>(dest: &mut Link<T>, src: Link<T>) -> Link<T> {
+fn replace(dest: &mut Link, src: Link) -> Link {
     mem::replace(dest, src)
 }
 
 
-impl<T: Copy + PartialEq + UniqueCheck> List<T> {
+impl List {
 
     // #[cfg_attr(feature="prusti", pure)]
     #[pure]
@@ -71,7 +63,7 @@ impl<T: Copy + PartialEq + UniqueCheck> List<T> {
     // #[cfg_attr(feature="prusti", requires(0 <= index && index < self.len()))]
     #[pure]
     #[requires(0 <= index && index < self.len())]
-    pub fn lookup(&self, index: usize) -> T {
+    pub fn lookup(&self, index: usize) -> TrustedRangeInclusive {
         self.head.lookup(index)
     }
 
@@ -95,7 +87,7 @@ impl<T: Copy + PartialEq + UniqueCheck> List<T> {
     #[ensures(self.len() == old(self.len()) + 1)] 
     #[ensures(self.lookup(0) == elem)]
     #[ensures(forall(|i: usize| (1 <= i && i < self.len()) ==> old(self.lookup(i-1)) == self.lookup(i)))]
-    pub fn push(&mut self, elem: T) {
+    pub fn push(&mut self, elem: TrustedRangeInclusive) {
         let new_node = Box::new(Node {
             elem: elem,
             next: replace(&mut self.head, Link::Empty)
@@ -120,7 +112,7 @@ impl<T: Copy + PartialEq + UniqueCheck> List<T> {
             !range.overlaps_with(&elem)
         })
     )]
-    pub fn push_unique(&mut self, elem: T) -> Result<(),usize> {
+    pub fn push_unique(&mut self, elem: TrustedRangeInclusive) -> Result<(),usize> {
         match self.elem_overlaps_in_list(elem, 0) {
             Some(idx) => Err(idx),
             None => {
@@ -149,7 +141,7 @@ impl<T: Copy + PartialEq + UniqueCheck> List<T> {
     #[ensures(forall(|i: usize, j: usize| (0 <= i && i < self.len() && 0 <= j && j < self.len()) ==> 
         (i != j ==> !self.lookup(i).overlaps_with(&self.lookup(j))))
     )]
-    pub fn push_unique2(&mut self, elem: T) -> Result<(),usize> {
+    pub fn push_unique2(&mut self, elem: TrustedRangeInclusive) -> Result<(),usize> {
         match self.elem_overlaps_in_list(elem, 0) {
             Some(idx) => Err(idx),
             None => {
@@ -187,7 +179,7 @@ impl<T: Copy + PartialEq + UniqueCheck> List<T> {
     #[ensures(old(self.len()) > 0 ==>
         forall(|i: usize| (0 <= i && i < self.len()) ==> old(self.lookup(i+1)) == self.lookup(i))
     )]
-    pub fn pop(&mut self) -> Option<T> {
+    pub fn pop(&mut self) -> Option<TrustedRangeInclusive> {
         match replace(&mut self.head, Link::Empty) {
             Link::Empty => {
                 None
@@ -265,7 +257,7 @@ impl<T: Copy + PartialEq + UniqueCheck> List<T> {
             !range.overlaps_with(&elem)
         })
     )]
-    pub(crate) fn elem_overlaps_in_list(&self, elem: T, index: usize) -> Option<usize> {
+    pub(crate) fn elem_overlaps_in_list(&self, elem: TrustedRangeInclusive, index: usize) -> Option<usize> {
         if index >= self.len() {
             return None;
         }
@@ -279,7 +271,7 @@ impl<T: Copy + PartialEq + UniqueCheck> List<T> {
 
 }
 
-impl<T: Copy + PartialEq + UniqueCheck> Link<T> {
+impl Link {
 
     // #[cfg_attr(feature="prusti", pure)]
     // #[cfg_attr(feature="prusti", ensures(self.is_empty() ==> result == 0))]
@@ -307,7 +299,7 @@ impl<T: Copy + PartialEq + UniqueCheck> Link<T> {
     // #[cfg_attr(feature="prusti", requires(0 <= index && index < self.len()))]
     #[pure]
     #[requires(0 <= index && index < self.len())]
-    pub fn lookup(&self, index: usize) -> T {
+    pub fn lookup(&self, index: usize) -> TrustedRangeInclusive {
         match self {
             Link::Empty => unreachable!(),
             Link::More(box node) => {

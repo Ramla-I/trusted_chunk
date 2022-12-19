@@ -22,8 +22,8 @@ pub(crate) mod trusted_range_inclusive;
 pub(crate) mod trusted_option;
 pub(crate) mod trusted_result;
 mod test;
-mod static_array;
-mod static_array_linked_list;
+// mod static_array;
+// mod static_array_linked_list;
 
 /*** Constants taken from kernel_config crate. Only required if CHECK_OVERFLOWS flag is enabled. ***/ 
 /// The lower 12 bits of a virtual address correspond to the P1 page frame offset. 
@@ -40,7 +40,7 @@ const MAX_PAGE_NUMBER: usize = MAX_VIRTUAL_ADDRESS / PAGE_SIZE;
 /// * there is an overlap with an existing chunk
 // #[cfg_attr(feature="prusti", trusted)]
 #[trusted]
-pub fn create_new_trusted_chunk(range: RangeInclusive<usize>, chunk_list: &mut List<TrustedRangeInclusive>) -> Result<TrustedChunk, &'static str> {
+pub fn create_new_trusted_chunk(range: RangeInclusive<usize>, chunk_list: &mut List) -> Result<TrustedChunk, &'static str> {
     if range.start() > range.end() {
         return Err("Invalid range, start > end");
     }
@@ -111,11 +111,11 @@ impl TrustedChunk {
     // #[cfg_attr(feature="prusti", requires(frames.start <= frames.end))]
     // #[cfg_attr(feature="prusti", ensures(result.is_some() ==> peek_chunk(&result).frames.start == frames.start))]
     // #[cfg_attr(feature="prusti", ensures(result.is_some() ==> peek_chunk(&result).frames.end == frames.end))]
-    #[trusted]
+    // #[trusted]
     #[requires(frames.start <= frames.end)]
     #[ensures(result.is_some() ==> peek_chunk(&result).frames.start == frames.start)]
     #[ensures(result.is_some() ==> peek_chunk(&result).frames.end == frames.end)]
-    fn new(frames: TrustedRangeInclusive, chunk_list: &mut List<TrustedRangeInclusive>) -> Option<TrustedChunk> {
+    fn new(frames: TrustedRangeInclusive, chunk_list: &mut List) -> Option<TrustedChunk> {
         if Self::add_chunk_to_list(frames, chunk_list) {
             Some(TrustedChunk { frames })
         } else {
@@ -131,7 +131,7 @@ impl TrustedChunk {
     // / Unfortunately, Prusti starts giving errors at this level.
     // / For now, this function is easy to manually inspect and all List functions are formally verified.
     // #[cfg_attr(feature="prusti", trusted)]
-    #[trusted]
+    // #[trusted]
     #[ensures(result ==> chunk_list.len() == old(chunk_list.len()) + 1)] 
     #[ensures(result ==> chunk_list.lookup(0) == frames)]
     #[ensures(result ==> forall(|i: usize| (1 <= i && i < chunk_list.len()) ==> old(chunk_list.lookup(i-1)) == chunk_list.lookup(i)))]
@@ -139,7 +139,7 @@ impl TrustedChunk {
     #[ensures(!result ==> chunk_list.len() == old(chunk_list.len()))] 
     #[ensures(!result ==> forall(|i: usize| (1 <= i && i < chunk_list.len()) ==> old(chunk_list.lookup(i)) == chunk_list.lookup(i)))]
     // #[ensures(!result ==> exists(|i: usize| (0 <= i && i < chunk_list.len()) ==> chunk_list.lookup(i)))]
-    fn add_chunk_to_list(frames: TrustedRangeInclusive, chunk_list: &mut List<TrustedRangeInclusive>) -> bool {
+    fn add_chunk_to_list(frames: TrustedRangeInclusive, chunk_list: &mut List) -> bool {
         if chunk_list.elem_overlaps_in_list(frames, 0).is_some(){
             false
         } else {
