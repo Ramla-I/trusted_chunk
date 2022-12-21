@@ -8,7 +8,7 @@ use crate::{
     trusted_option::*,
     unique_check::*,
     trusted_result::*,
-    trusted_range_inclusive::*
+    trusted_range_inclusive::*,
 };
 use core::{
     mem,
@@ -27,7 +27,7 @@ pub(crate) enum Link {
 }
 
 pub(crate) struct Node {
-    elem: TrustedRangeInclusive,
+    elem: RangeInclusive<usize>,
     next: Link,
 }
 
@@ -63,7 +63,7 @@ impl List {
     // #[cfg_attr(feature="prusti", requires(0 <= index && index < self.len()))]
     #[pure]
     #[requires(0 <= index && index < self.len())]
-    pub fn lookup(&self, index: usize) -> TrustedRangeInclusive {
+    pub fn lookup(&self, index: usize) -> RangeInclusive<usize> {
         self.head.lookup(index)
     }
 
@@ -87,7 +87,7 @@ impl List {
     #[ensures(self.len() == old(self.len()) + 1)] 
     #[ensures(self.lookup(0) == elem)]
     #[ensures(forall(|i: usize| (1 <= i && i < self.len()) ==> old(self.lookup(i-1)) == self.lookup(i)))]
-    pub fn push(&mut self, elem: TrustedRangeInclusive) {
+    pub fn push(&mut self, elem: RangeInclusive<usize>) {
         let new_node = Box::new(Node {
             elem: elem,
             next: replace(&mut self.head, Link::Empty)
@@ -112,7 +112,7 @@ impl List {
             !range.overlaps_with(&elem)
         })
     )]
-    pub fn push_unique(&mut self, elem: TrustedRangeInclusive) -> Result<(),usize> {
+    pub fn push_unique(&mut self, elem: RangeInclusive<usize>) -> Result<(),usize> {
         match self.elem_overlaps_in_list(elem, 0) {
             Some(idx) => Err(idx),
             None => {
@@ -141,7 +141,7 @@ impl List {
     #[ensures(forall(|i: usize, j: usize| (0 <= i && i < self.len() && 0 <= j && j < self.len()) ==> 
         (i != j ==> !self.lookup(i).overlaps_with(&self.lookup(j))))
     )]
-    pub fn push_unique2(&mut self, elem: TrustedRangeInclusive) -> Result<(),usize> {
+    pub fn push_unique2(&mut self, elem: RangeInclusive<usize>) -> Result<(),usize> {
         match self.elem_overlaps_in_list(elem, 0) {
             Some(idx) => Err(idx),
             None => {
@@ -175,11 +175,11 @@ impl List {
     #[ensures(old(self.len()) > 0 ==> result.is_some())]
     #[ensures(old(self.len()) == 0 ==> self.len() == 0)]
     #[ensures(old(self.len()) > 0 ==> self.len() == old(self.len()-1))]
-    #[ensures(old(self.len()) > 0 ==> peek_option(&result) == old(self.lookup(0)))]
+    #[ensures(old(self.len()) > 0 ==> *peek_option_ref(&result) == old(self.lookup(0)))]
     #[ensures(old(self.len()) > 0 ==>
         forall(|i: usize| (0 <= i && i < self.len()) ==> old(self.lookup(i+1)) == self.lookup(i))
     )]
-    pub fn pop(&mut self) -> Option<TrustedRangeInclusive> {
+    pub fn pop(&mut self) -> Option<RangeInclusive<usize>> {
         match replace(&mut self.head, Link::Empty) {
             Link::Empty => {
                 None
@@ -257,7 +257,7 @@ impl List {
             !range.overlaps_with(&elem)
         })
     )]
-    pub(crate) fn elem_overlaps_in_list(&self, elem: TrustedRangeInclusive, index: usize) -> Option<usize> {
+    pub(crate) fn elem_overlaps_in_list(&self, elem: RangeInclusive<usize>, index: usize) -> Option<usize> {
         if index >= self.len() {
             return None;
         }
@@ -299,7 +299,7 @@ impl Link {
     // #[cfg_attr(feature="prusti", requires(0 <= index && index < self.len()))]
     #[pure]
     #[requires(0 <= index && index < self.len())]
-    pub fn lookup(&self, index: usize) -> TrustedRangeInclusive {
+    pub fn lookup(&self, index: usize) -> RangeInclusive<usize> {
         match self {
             Link::Empty => unreachable!(),
             Link::More(box node) => {

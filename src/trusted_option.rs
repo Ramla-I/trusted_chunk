@@ -31,43 +31,6 @@ impl<T: Copy + PartialEq> PartialEq for core::option::Option<T> {
         result == (val1 == val2)
     })]
     fn eq(&self, other:&Self) -> bool;
-
-    // #[pure]
-    // #[ensures(result == !self.eq(other))]
-    // fn ne(&self, other:&Self) -> bool;
-}
-
-// #[cfg_attr(feature="prusti", pure)]
-// #[cfg_attr(feature="prusti", requires(val.is_some()))]
-#[pure]
-#[requires(val.is_some())]
-pub(crate) fn peek_range(val: &Option<TrustedRangeInclusive>) -> TrustedRangeInclusive {
-    match val {
-        Some(val) => *val,
-        None => unreachable!(),
-    }
-}
-
-// #[cfg_attr(feature="prusti", pure)]
-// #[cfg_attr(feature="prusti", requires(val.is_some()))]
-#[pure]
-#[requires(val.is_some())]
-pub(crate) fn peek_usize(val: &Option<usize>) -> usize {
-    match val {
-        Some(val) => *val,
-        None => unreachable!(),
-    }
-}
-
-// #[cfg_attr(feature="prusti", pure)]
-// #[cfg_attr(feature="prusti", requires(val.is_some()))]
-#[pure]
-#[requires(val.is_some())]
-pub(crate) fn peek_chunk(val: &Option<TrustedChunk>) -> &TrustedChunk {
-    match val {
-        Some(val) => val,
-        None => unreachable!(),
-    }
 }
 
 #[pure]
@@ -79,17 +42,11 @@ pub(crate) fn peek_option<T: Copy>(val: &Option<T>) -> T {
     }
 }
 
-// #[pure]
-// pub(crate) fn equal_option<T: Copy + PartialEq>(o1: Option<T>, o2: Option<T>) -> bool {
-//     if o1.is_none() && o2.is_none() {
-//         true
-//     }
-//     else if o1.is_none() && o2.is_some() {
-//         false
-//     }
-//     else if o1.is_some() && o2.is_none() {
-//         false
-//     }
-
-
-// }
+#[pure]
+#[requires(val.is_some())]
+pub(crate) fn peek_option_ref<T>(val: &Option<T>) -> &T {
+    match val {
+        Some(val) => val,
+        None => unreachable!(),
+    }
+}

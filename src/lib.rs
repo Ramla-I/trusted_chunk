@@ -1,6 +1,6 @@
 #![feature(box_patterns)]
 #![allow(unused)]
-
+#![feature(step_trait)]
 // #[cfg(feature="prusti")]
 #[macro_use]
 extern crate prusti_contracts;
@@ -8,7 +8,7 @@ extern crate prusti_contracts;
 // #[cfg(feature="prusti")]
 use prusti_contracts::*;
 
-use core::ops::{Deref, RangeInclusive};
+use core::ops::{Deref};
 use crate::{
     linked_list::*,
     trusted_range_inclusive::*,
@@ -22,6 +22,8 @@ pub(crate) mod trusted_range_inclusive;
 pub(crate) mod trusted_option;
 pub(crate) mod trusted_result;
 mod test;
+mod memory_structs;
+
 // mod static_array;
 // mod static_array_linked_list;
 
@@ -44,7 +46,7 @@ pub fn create_new_trusted_chunk(range: RangeInclusive<usize>, chunk_list: &mut L
     if range.start() > range.end() {
         return Err("Invalid range, start > end");
     }
-    TrustedChunk::new(TrustedRangeInclusive::new(*range.start(), *range.end()), chunk_list)
+    TrustedChunk::new(RangeInclusive::new(*range.start(), *range.end()), chunk_list)
         .ok_or("Overlapping range with an existing Chunk!")
 }
 
@@ -61,12 +63,12 @@ pub fn create_new_trusted_chunk(range: RangeInclusive<usize>, chunk_list: &mut L
 // /// (See static_array.rs and static_array_linked_list.rs)
 // // #[cfg_attr(feature="prusti", trusted)]
 // #[trusted]
-// pub fn convert_unallocated_regions_to_chunks(unallocated_regions: [Option<RangeInclusive<usize>>; 32]) -> Result<List<TrustedRangeInclusive>, &'static str> {
+// pub fn convert_unallocated_regions_to_chunks(unallocated_regions: [Option<RangeInclusive<usize>>; 32]) -> Result<List<RangeInclusive>, &'static str> {
 //     let mut list = List::new();
 //     for range in unallocated_regions {
 //         if let Some(r) = range {
 //             if r.start() <= r.end() {
-//                 let elem = TrustedRangeInclusive::new(*r.start(), *r.end());
+//                 let elem = RangeInclusive::new(*r.start(), *r.end());
 //                 if List::overlaps(&list.head, elem) {
 //                     return Err("overlapping ranges in the initial array of chunks");
 //                 }
@@ -83,10 +85,10 @@ pub fn create_new_trusted_chunk(range: RangeInclusive<usize>, chunk_list: &mut L
 /// An instantiation of this struct is formally verified to not overlap with any other `TrustedChunk`.
 /// 
 /// # Warning
-/// A `TrustedRangeInclusive` is created with the precondition that start <= end.
+/// A `RangeInclusive` is created with the precondition that start <= end.
 /// Outside of verified code, it is the caller's responsibility to make sure that precondition is upheld.
 pub struct TrustedChunk {
-    frames: TrustedRangeInclusive
+    frames: RangeInclusive<usize>
 }
 
 impl TrustedChunk {
@@ -113,9 +115,9 @@ impl TrustedChunk {
     // #[cfg_attr(feature="prusti", ensures(result.is_some() ==> peek_chunk(&result).frames.end == frames.end))]
     // #[trusted]
     #[requires(frames.start <= frames.end)]
-    #[ensures(result.is_some() ==> peek_chunk(&result).frames.start == frames.start)]
-    #[ensures(result.is_some() ==> peek_chunk(&result).frames.end == frames.end)]
-    fn new(frames: TrustedRangeInclusive, chunk_list: &mut List) -> Option<TrustedChunk> {
+    #[ensures(result.is_some() ==> peek_option_ref(&result).frames.start == frames.start)]
+    #[ensures(result.is_some() ==> peek_option_ref(&result).frames.end == frames.end)]
+    fn new(frames: RangeInclusive<usize>, chunk_list: &mut List) -> Option<TrustedChunk> {
         if Self::add_chunk_to_list(frames, chunk_list) {
             Some(TrustedChunk { frames })
         } else {
@@ -139,7 +141,7 @@ impl TrustedChunk {
     #[ensures(!result ==> chunk_list.len() == old(chunk_list.len()))] 
     #[ensures(!result ==> forall(|i: usize| (1 <= i && i < chunk_list.len()) ==> old(chunk_list.lookup(i)) == chunk_list.lookup(i)))]
     // #[ensures(!result ==> exists(|i: usize| (0 <= i && i < chunk_list.len()) ==> chunk_list.lookup(i)))]
-    fn add_chunk_to_list(frames: TrustedRangeInclusive, chunk_list: &mut List) -> bool {
+    fn add_chunk_to_list(frames: RangeInclusive<usize>, chunk_list: &mut List) -> bool {
         if chunk_list.elem_overlaps_in_list(frames, 0).is_some(){
             false
         } else {
@@ -156,7 +158,7 @@ impl TrustedChunk {
     #[requires(frames.start <= frames.end)]
     #[ensures(result.frames.start == frames.start)]
     #[ensures(result.frames.end == frames.end)]
-    fn trusted_new(frames: TrustedRangeInclusive) -> TrustedChunk {
+    fn trusted_new(frames: RangeInclusive<usize>) -> TrustedChunk {
         TrustedChunk{frames}
     }
 
@@ -193,25 +195,56 @@ impl TrustedChunk {
         let first_chunk = if start_page == self.frames.start  {
             None
         } else {
-            Some(TrustedChunk::trusted_new(TrustedRangeInclusive::new(self.frames.start, start_page - 1)))
+            Some(TrustedChunk::trusted_new(RangeInclusive::new(self.frames.start, start_page - 1)))
         };
-        let second_chunk = TrustedChunk::trusted_new(TrustedRangeInclusive::new(start_page, start_page + num_frames - 1));
+        let second_chunk = TrustedChunk::trusted_new(RangeInclusive::new(start_page, start_page + num_frames - 1));
 
         let third_chunk = if start_page + num_frames - 1 == self.frames.end {
             None
         } else {
-            Some(TrustedChunk::trusted_new(TrustedRangeInclusive::new(start_page + num_frames, self.frames.end)))
+            Some(TrustedChunk::trusted_new(RangeInclusive::new(start_page + num_frames, self.frames.end)))
         };
 
         Ok((first_chunk, second_chunk, third_chunk))
+    }
+
+    #[ensures(result.is_ok() ==> 
+        (old(self.start()) == other.end() + 1 && self.start() == other.start() && self.end() == old(self.end())) 
+        || 
+        (old(self.end()) + 1 == other.start() && self.end() == other.end() && self.start() == old(self.start()))
+    )]
+    #[ensures(result.is_err() ==> {
+        let chunk = peek_err_ref(&result);
+        (chunk.start() == other.start()) && (chunk.end() == other.end()) 
+    })]
+    #[ensures(result.is_err() ==> {
+        (self.start() == old(self.start())) && (self.end() == old(self.end())) 
+    })]
+    pub fn merge(&mut self, other: TrustedChunk) -> Result<(), TrustedChunk> {
+        if self.start() == other.end() + 1 {
+            // `other` comes contiguously before `self`
+            self.frames = RangeInclusive::new(other.start(), self.end());
+        } 
+        else if self.end() + 1 == other.start() {
+            // `self` comes contiguously before `other`
+            self.frames = RangeInclusive::new(self.start(), other.end());
+        }
+        else {
+            // non-contiguous
+            return Err(other);
+        }
+
+        // ensure the now-merged AllocatedFrames doesn't run its drop handler and free its frames.
+        core::mem::forget(other); 
+        Ok(())
     }
 }
 
 
 impl Deref for TrustedChunk {
-    type Target = TrustedRangeInclusive;
+    type Target = RangeInclusive<usize>;
     #[pure]
-    fn deref(&self) -> &TrustedRangeInclusive {
+    fn deref(&self) -> &RangeInclusive<usize> {
         &self.frames
     }
 }
