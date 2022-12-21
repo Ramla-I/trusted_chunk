@@ -9,6 +9,7 @@ use crate::{
     unique_check::*,
     trusted_result::*,
     trusted_range_inclusive::*,
+    memory_structs::*
 };
 use core::{
     mem,

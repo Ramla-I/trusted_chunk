@@ -1,6 +1,7 @@
 use core::{
-    ops::{Add, AddAssign, Deref, DerefMut, RangeInclusive, Sub, SubAssign},
+    ops::{Add, AddAssign, Deref, DerefMut, Sub, SubAssign},
 };
+use crate::trusted_range_inclusive::*;
 
 pub const MAX_VIRTUAL_ADDRESS: usize = 0xFFFF_FFFF;//usize::MAX;
 
@@ -51,7 +52,7 @@ impl SubAssign<usize> for Frame {
 
 
 /// A range of [`Frame`]s that are contiguous in physical memory.
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Copy, Clone, PartialEq, Eq)]
 pub struct FrameRange(RangeInclusive<Frame>);
 
 impl FrameRange {
@@ -59,16 +60,22 @@ impl FrameRange {
     pub const fn new(start: Frame, end: Frame) -> FrameRange {
         FrameRange(RangeInclusive::new(start, end))
     }
+
+    pub const fn into_inner(&self) -> RangeInclusive<Frame> {
+        self.0
+    }
 }
 
 impl Deref for FrameRange {
     type Target = RangeInclusive<Frame>;
+    #[pure]
     fn deref(&self) -> &RangeInclusive<Frame> {
         &self.0
     }
 }
-impl DerefMut for FrameRange {
-    fn deref_mut(&mut self) -> &mut RangeInclusive<Frame> {
-        &mut self.0
-    }
-}
+// impl DerefMut for FrameRange {
+//     #[pure]
+//     fn deref_mut(&mut self) -> &mut RangeInclusive<Frame> {
+//         &mut self.0
+//     }
+// }

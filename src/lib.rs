@@ -13,7 +13,8 @@ use crate::{
     linked_list::*,
     trusted_range_inclusive::*,
     trusted_option::*,
-	trusted_result::*
+	trusted_result::*,
+    memory_structs::*
 };
 
 mod unique_check;
@@ -80,6 +81,22 @@ pub fn create_new_trusted_chunk(range: RangeInclusive<usize>, chunk_list: &mut L
 //     }
 //     Ok(list)
 // }
+
+pub struct Chunk {
+    frames: FrameRange
+}
+
+impl Chunk {
+    fn from_trusted(tchunk: TrustedChunk, start_frame: Frame, end_frame: Frame) -> Option<Self> {
+        if tchunk.start() == start_frame.number && tchunk.end() == end_frame.number {
+            Some(Chunk {
+                frames: FrameRange::new(start_frame, end_frame)
+            })
+        } else {
+            None
+        }
+    }
+}
 
 /// A struct representing a unique unallocated region in memory.
 /// An instantiation of this struct is formally verified to not overlap with any other `TrustedChunk`.
