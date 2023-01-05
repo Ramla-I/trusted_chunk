@@ -4,9 +4,9 @@ use prusti_contracts::*;
 use crate::unique_check::*;
 
 #[derive(Copy, Clone, PartialEq, Eq)]
-pub struct RangeInclusive<Idx: Clone + PartialOrd + PartialEq> {
-    pub(crate) start: Idx,
-    pub(crate) end: Idx
+pub struct RangeInclusive<Idx: Clone + PartialOrd> {
+    start: Idx,
+    end: Idx
 }
 
 impl<Idx: Clone + PartialOrd + PartialEq> RangeInclusive<Idx> {
@@ -19,10 +19,12 @@ impl<Idx: Clone + PartialOrd + PartialEq> RangeInclusive<Idx> {
         Self{start, end}
     }
 
+    #[pure]
     pub const fn start(&self) -> &Idx {
         &self.start
     }
 
+    #[pure]
     pub const fn end(&self) -> &Idx {
         &self.end
     }

@@ -111,14 +111,18 @@ pub struct TrustedChunk {
 impl TrustedChunk {
     // #[cfg_attr(feature="prusti", pure)]
     #[pure]
+    #[trusted]
+    #[ensures(result == *self.frames.start())]
     pub fn start(&self) -> usize {
-        self.frames.start
+        *self.frames.start()
     }
 
     // #[cfg_attr(feature="prusti", pure)]
     #[pure]
+    #[trusted]
+    #[ensures(result == *self.frames.end())]
     pub fn end(&self) -> usize {
-        self.frames.end
+        *self.frames.end()
     }
 
     /// Creates a new `TrustedChunk` iff no other chunk in the system overlaps with it, and adds the newly created chunk range to `chunk_list`.
@@ -131,9 +135,9 @@ impl TrustedChunk {
     // #[cfg_attr(feature="prusti", ensures(result.is_some() ==> peek_chunk(&result).frames.start == frames.start))]
     // #[cfg_attr(feature="prusti", ensures(result.is_some() ==> peek_chunk(&result).frames.end == frames.end))]
     // #[trusted]
-    #[requires(frames.start <= frames.end)]
-    #[ensures(result.is_some() ==> peek_option_ref(&result).frames.start == frames.start)]
-    #[ensures(result.is_some() ==> peek_option_ref(&result).frames.end == frames.end)]
+    #[requires(*frames.start() <= *frames.end())]
+    #[ensures(result.is_some() ==> *peek_option_ref(&result).frames.start() == *frames.start())]
+    #[ensures(result.is_some() ==> *peek_option_ref(&result).frames.end() == *frames.end())]
     fn new(frames: RangeInclusive<usize>, chunk_list: &mut List) -> Option<TrustedChunk> {
         if Self::add_chunk_to_list(frames, chunk_list) {
             Some(TrustedChunk { frames })
@@ -172,9 +176,9 @@ impl TrustedChunk {
     // #[cfg_attr(feature="prusti", requires(frames.start <= frames.end))]
     // #[cfg_attr(feature="prusti", ensures(result.frames.start == frames.start))]
     // #[cfg_attr(feature="prusti", ensures(result.frames.end == frames.end))]
-    #[requires(frames.start <= frames.end)]
-    #[ensures(result.frames.start == frames.start)]
-    #[ensures(result.frames.end == frames.end)]
+    #[requires(*frames.start() <= *frames.end())]
+    #[ensures(result.start() == *frames.start())]
+    #[ensures(result.end() == *frames.end())]
     fn trusted_new(frames: RangeInclusive<usize>) -> TrustedChunk {
         TrustedChunk{frames}
     }
@@ -202,24 +206,24 @@ impl TrustedChunk {
     #[ensures(result.is_ok() ==> split_chunk_has_same_range(&self, peek_result_ref(&result)))]
     #[ensures(result.is_err() ==> {
         let orig_chunk = peek_err_ref(&result);
-        (orig_chunk.start == self.start) && (orig_chunk.end == self.end)
+        (orig_chunk.start() == self.start()) && (orig_chunk.end() == self.end())
     })]
     pub fn split(self, start_page: usize, num_frames: usize) -> Result<(Option<TrustedChunk>, TrustedChunk, Option<TrustedChunk>), TrustedChunk> {
-        if (start_page < self.frames.start) || (start_page + num_frames -1 > self.frames.end) || (num_frames <= 0) {
+        if (start_page < self.start()) || (start_page + num_frames -1 > self.end()) || (num_frames <= 0) {
             return Err(self);
         }
 
-        let first_chunk = if start_page == self.frames.start  {
+        let first_chunk = if start_page == self.start()  {
             None
         } else {
-            Some(TrustedChunk::trusted_new(RangeInclusive::new(self.frames.start, start_page - 1)))
+            Some(TrustedChunk::trusted_new(RangeInclusive::new(self.start(), start_page - 1)))
         };
         let second_chunk = TrustedChunk::trusted_new(RangeInclusive::new(start_page, start_page + num_frames - 1));
 
-        let third_chunk = if start_page + num_frames - 1 == self.frames.end {
+        let third_chunk = if start_page + num_frames - 1 == self.end() {
             None
         } else {
-            Some(TrustedChunk::trusted_new(RangeInclusive::new(start_page + num_frames, self.frames.end)))
+            Some(TrustedChunk::trusted_new(RangeInclusive::new(start_page + num_frames, self.end())))
         };
 
         Ok((first_chunk, second_chunk, third_chunk))
@@ -273,7 +277,7 @@ impl Deref for TrustedChunk {
 // #[cfg_attr(feature="prusti", pure)]
 #[pure]
 fn chunks_do_not_overlap(chunk1: &TrustedChunk, chunk2: &TrustedChunk) -> bool {
-    (chunk1.frames.end < chunk2.frames.start) | (chunk2.frames.end < chunk1.frames.start)
+    (chunk1.end() < chunk2.start()) | (chunk2.end() < chunk1.start())
 }
 
 /// Returns true if there is no overlap in the ranges of `chunk1`, `chunk2` and `chunk3`.
@@ -306,18 +310,18 @@ fn split_chunk_has_same_range(orig_chunk: &TrustedChunk, split_chunk: &(Option<T
     let max_page;
 
     if let Some(c1) = chunk1 {
-        min_page = c1.frames.start;    
+        min_page = c1.start();    
     } else {
-        min_page = chunk2.frames.start;
+        min_page = chunk2.start();
     }
 
     if let Some(c3) = chunk3 {
-        max_page = c3.frames.end;    
+        max_page = c3.end();    
     } else {
-        max_page = chunk2.frames.end;
+        max_page = chunk2.end();
     }
 
-    min_page == orig_chunk.frames.start && max_page == orig_chunk.frames.end
+    min_page == orig_chunk.start() && max_page == orig_chunk.end()
 }
 
 
@@ -331,10 +335,10 @@ fn split_chunk_has_same_range(orig_chunk: &TrustedChunk, split_chunk: &(Option<T
 fn split_chunk_is_contiguous(chunk1: &Option<TrustedChunk>, chunk2: &TrustedChunk, chunk3: &Option<TrustedChunk>) -> bool {
     let mut contiguous = true;
     if let Some(c1) = chunk1 {
-        contiguous &= c1.frames.end + 1 == chunk2.frames.start
+        contiguous &= c1.end() + 1 == chunk2.start()
     } 
     if let Some(c3) = chunk3 {
-        contiguous &= chunk2.frames.end + 1 == c3.frames.start
+        contiguous &= chunk2.end() + 1 == c3.start()
     }
     contiguous
 }
@@ -344,7 +348,7 @@ fn split_chunk_is_contiguous(chunk1: &Option<TrustedChunk>, chunk2: &TrustedChun
 #[pure]
 fn end_frame_is_less_than_max_or_none(chunk: &Option<TrustedChunk>) -> bool {
     if let Some(c) = chunk {
-        if c.frames.end <= MAX_PAGE_NUMBER {
+        if c.end() <= MAX_PAGE_NUMBER {
             return true;
         } else {
             return false;
@@ -359,7 +363,7 @@ fn end_frame_is_less_than_max_or_none(chunk: &Option<TrustedChunk>) -> bool {
 // #[cfg_attr(feature="prusti", pure)]
 #[pure]
 fn end_frame_is_less_than_max(chunk: &TrustedChunk) -> bool {
-    if chunk.frames.end <= MAX_PAGE_NUMBER {
+    if chunk.end() <= MAX_PAGE_NUMBER {
         return true;
     } else {
         return false;
