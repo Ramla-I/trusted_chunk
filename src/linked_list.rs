@@ -101,7 +101,7 @@ impl List {
     #[ensures(result.is_err() ==> {
             let idx = peek_err(&result);
             let range = self.lookup(idx);
-            range.overlaps_with(&elem)
+            range_overlaps(&range, &elem)
         }
     )]
     #[ensures(result.is_ok() ==> self.len() == old(self.len()) + 1)] 
@@ -110,7 +110,7 @@ impl List {
     #[ensures(result.is_ok() ==> 
         forall(|i: usize| (1 <= i && i < self.len()) ==> {
             let range = self.lookup(i);
-            !range.overlaps_with(&elem)
+            !range_overlaps(&range, &elem)
         })
     )]
     pub fn push_unique(&mut self, elem: RangeInclusive<usize>) -> Result<(),usize> {
@@ -128,7 +128,7 @@ impl List {
     }
 
     #[requires(forall(|i: usize, j: usize| (0 <= i && i < self.len() && 0 <= j && j < self.len()) ==> 
-        (i != j ==> !self.lookup(i).overlaps_with(&self.lookup(j))))
+        (i != j ==> !range_overlaps(&self.lookup(i), &self.lookup(j))))
     )]
     #[ensures(result.is_ok() ==> self.len() == old(self.len()) + 1)] 
     #[ensures(result.is_ok() ==> self.lookup(0) == elem)]
@@ -140,7 +140,7 @@ impl List {
     //     })
     // )]
     #[ensures(forall(|i: usize, j: usize| (0 <= i && i < self.len() && 0 <= j && j < self.len()) ==> 
-        (i != j ==> !self.lookup(i).overlaps_with(&self.lookup(j))))
+        (i != j ==> !range_overlaps(&self.lookup(i),&self.lookup(j))))
     )]
     pub fn push_unique2(&mut self, elem: RangeInclusive<usize>) -> Result<(),usize> {
         match self.elem_overlaps_in_list(elem, 0) {
@@ -249,20 +249,20 @@ impl List {
     #[ensures(result.is_some() ==> {
             let idx = peek_option(&result);
             let range = self.lookup(idx);
-            range.overlaps_with(&elem)
+            range_overlaps(&range, &elem)
         }
     )]
     #[ensures(result.is_none() ==> 
         forall(|i: usize| (index <= i && i < self.len()) ==> {
             let range = self.lookup(i);
-            !range.overlaps_with(&elem)
+            !range_overlaps(&range, &elem)
         })
     )]
     pub(crate) fn elem_overlaps_in_list(&self, elem: RangeInclusive<usize>, index: usize) -> Option<usize> {
         if index >= self.len() {
             return None;
         }
-        let ret = if self.lookup(index).overlaps_with(&elem) {
+        let ret = if range_overlaps(&self.lookup(index),&elem) {
             Some(index)
         } else {
             self.elem_overlaps_in_list(elem, index + 1)
