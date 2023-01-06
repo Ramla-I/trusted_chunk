@@ -6,7 +6,6 @@ use prusti_contracts::*;
 
 use crate::{
     trusted_option::*,
-    unique_check::*,
     trusted_result::*,
     trusted_range_inclusive::*,
     memory_structs::*

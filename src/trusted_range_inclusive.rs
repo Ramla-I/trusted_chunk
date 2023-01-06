@@ -1,8 +1,6 @@
 // #[cfg(feature="prusti")]
 use prusti_contracts::*;
 
-use crate::unique_check::*;
-
 #[derive(Copy, Clone, PartialEq, Eq)]
 pub struct RangeInclusive<Idx: Clone + PartialOrd> {
     start: Idx,
