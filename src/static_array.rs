@@ -1,21 +1,25 @@
-// #[cfg(feature="prusti")]
 use prusti_contracts::*;
 
-use crate::{
-    trusted_option::*,
-    trusted_result::*,
-    trusted_range_inclusive::*,
-    unique_check::*
-};
-use core::{
-    mem,
-};
-
-pub struct StaticArray<T: Copy + PartialEq + UniqueCheck>  {
-	pub(crate) arr: [Option<T>; 32]
+cfg_if::cfg_if! {
+if #[cfg(prusti)] {
+    use crate::spec::{
+        trusted_option::*,
+        trusted_result::*,
+        trusted_range_inclusive::*,
+    };
+} else {
+    use range_inclusive::*;
+}
 }
 
-impl<T: Copy + PartialEq + UniqueCheck> StaticArray<T> {
+use crate::range_overlaps::*;
+use core::mem;
+
+pub struct StaticArray  {
+	pub(crate) arr: [Option<RangeInclusive<usize>>; 32]
+}
+
+impl StaticArray {
     pub const fn new() -> Self {
         StaticArray {
             arr: [None; 32]
@@ -30,7 +34,7 @@ impl<T: Copy + PartialEq + UniqueCheck> StaticArray<T> {
 
     #[pure]
     #[requires(0 <= index && index < self.len())]
-    pub fn lookup(&self, index: usize) -> Option<T> {
+    pub fn lookup(&self, index: usize) -> Option<RangeInclusive<usize>> {
         self.arr[index]
     }
 
@@ -61,7 +65,7 @@ impl<T: Copy + PartialEq + UniqueCheck> StaticArray<T> {
     #[ensures(result.is_ok() ==> 
         forall(|i: usize| ((0 <= i && i < 32) && (i != peek_result(&result))) ==> old(self.arr[i]) == self.arr[i])
     )] 
-	pub fn push(&mut self, value: T) -> Result<usize, T> {
+	pub fn push(&mut self, value: RangeInclusive<usize>) -> Result<usize, RangeInclusive<usize>> {
         let mut i = 0;
 
         while i < 32 {
@@ -102,23 +106,23 @@ impl<T: Copy + PartialEq + UniqueCheck> StaticArray<T> {
     #[ensures(result.is_some() ==> {
             let idx = peek_option(&result);
             let range = peek_option(&self.arr[idx]);
-            range.overlaps_with(&elem)
+            range_overlaps(&range, &elem)
         }
     )]
     #[ensures(result.is_none() ==> 
         forall(|i: usize| ((index <= i && i < 32) && self.arr[i].is_some()) ==> {
             let range = peek_option(&self.arr[i]);
-            !range.overlaps_with(&elem)
+            !range_overlaps(&range, &elem)
         })
     )]
-    pub(crate) fn elem_overlaps_in_array(&self, elem: T, index: usize) -> Option<usize> {
+    pub(crate) fn elem_overlaps_in_array(&self, elem: RangeInclusive<usize>, index: usize) -> Option<usize> {
         if index >= 32 {
             return None;
         }
 
         let ret = match self.arr[index] {
             Some(val) => {
-                if val.overlaps_with(&elem) {
+                if range_overlaps(&val,&elem) {
                     Some(index)
                 } else {
                     self.elem_overlaps_in_array(elem, index + 1)

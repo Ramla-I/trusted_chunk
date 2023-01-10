@@ -20,9 +20,9 @@ use crate::{
 pub(crate) mod range_overlaps;
 pub(crate) mod linked_list;
 mod trusted_chunk;
+mod static_array;
+mod static_array_linked_list;
 // mod test;
-// mod static_array;
-// mod static_array_linked_list;
 
 cfg_if::cfg_if! {
 if #[cfg(prusti)] {

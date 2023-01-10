@@ -1,13 +1,20 @@
-// #[cfg(feature="prusti")]
 use prusti_contracts::*;
+cfg_if::cfg_if! {
+if #[cfg(prusti)] {
+	use crate::spec::{
+		trusted_option::*,
+		trusted_result::*,
+		trusted_range_inclusive::*,
+	};
+} else {
+	use range_inclusive::*;
+}
+}
 
 use crate::{
-    linked_list::*,
-    trusted_range_inclusive::*,
-    trusted_option::*,
-	trusted_result::*,
+	range_overlaps::*,
 	static_array::*,
-	unique_check::*
+	linked_list::*
 };
 
 
@@ -17,12 +24,12 @@ use crate::{
 /// and then abstract over both that and the inner `LinkedList` when using it. 
 /// 
 /// TODO: use const generics to allow this to be of any arbitrary size beyond 32 elements.
-pub enum StaticArrayLinkedList<T: Copy + PartialEq + UniqueCheck> {
-	Array(StaticArray<T>),
-	LinkedList(List<T>),
+pub enum StaticArrayLinkedList {
+	Array(StaticArray),
+	LinkedList(List),
 }
 
-impl<T: Copy + PartialEq + UniqueCheck> StaticArrayLinkedList<T> {
+impl StaticArrayLinkedList {
 	#[pure]
 	fn len(&self) -> usize {
 		match self {
@@ -50,7 +57,7 @@ impl<T: Copy + PartialEq + UniqueCheck> StaticArrayLinkedList<T> {
 	// #[cfg_attr(feature="prusti", requires(self.is_array()))]
 	#[pure]
 	#[requires(self.is_array())]
-	fn peek_array(&self) -> &StaticArray<T> {
+	fn peek_array(&self) -> &StaticArray {
 		match self {
 			StaticArrayLinkedList::Array(val) => val,
 			StaticArrayLinkedList::LinkedList(_) => unreachable!(),
@@ -61,7 +68,7 @@ impl<T: Copy + PartialEq + UniqueCheck> StaticArrayLinkedList<T> {
 	// #[cfg_attr(feature="prusti", requires(self.is_linked_list()))]
 	#[pure]
 	#[requires(self.is_linked_list())]
-	fn peek_linked_list(&self) -> &List<T> {
+	fn peek_linked_list(&self) -> &List {
 		match self {
 			StaticArrayLinkedList::Array(_) => unreachable!(),
 			StaticArrayLinkedList::LinkedList(val) => val,
@@ -122,7 +129,7 @@ impl<T: Copy + PartialEq + UniqueCheck> StaticArrayLinkedList<T> {
     #[ensures(self.is_linked_list() ==> forall(|i: usize| (1 <= i && i < self.peek_linked_list().len()) ==>
         old(self.peek_linked_list().lookup(i-1)) == self.peek_linked_list().lookup(i))
 	)]
-	pub(crate) fn push(&mut self, value: T) -> Result<usize, T>{
+	pub(crate) fn push(&mut self, value: RangeInclusive<usize>) -> Result<usize, RangeInclusive<usize>>{
 		match self {
 			StaticArrayLinkedList::Array(arr) => {
 				arr.push(value)
@@ -140,29 +147,29 @@ impl<T: Copy + PartialEq + UniqueCheck> StaticArrayLinkedList<T> {
 	#[ensures(self.is_array() && result.is_some() ==> {
 			let idx = peek_option(&result);
 			let range = peek_option(&self.peek_array().arr[idx]);
-			range.overlaps_with(&elem)
+			range_overlaps(&range, &elem)
 		}
 	)]
 	#[ensures(self.is_array() && result.is_none() ==> 
 		forall(|i: usize| ((0 <= i && i < 32) && self.peek_array().arr[i].is_some()) ==> {
 			let range = peek_option(&self.peek_array().arr[i]);
-			!range.overlaps_with(&elem)
+			!range_overlaps(&range, &elem)
 		})
 	)]
 	#[ensures(self.is_linked_list() && result.is_some() ==> peek_option(&result) < self.len())]
 	#[ensures(self.is_linked_list() && result.is_some() ==> {
 			let idx = peek_option(&result);
 			let range = self.peek_linked_list().lookup(idx);
-			range.overlaps_with(&elem)
+			range_overlaps(&range, &elem)
 		}
 	)]
 	#[ensures(self.is_linked_list() && result.is_none() ==> 
 		forall(|i: usize| (0 <= i && i < self.len()) ==> {
 			let range = self.peek_linked_list().lookup(i);
-			!range.overlaps_with(&elem)
+			!range_overlaps(&range, &elem)
 		})
 	)]
-	pub(crate) fn elem_overlaps(&self, elem: T) -> Option<usize> {
+	pub(crate) fn elem_overlaps(&self, elem: RangeInclusive<usize>) -> Option<usize> {
 		match self{
 			StaticArrayLinkedList::Array(sa) => {
 				sa.elem_overlaps_in_array(elem, 0)
