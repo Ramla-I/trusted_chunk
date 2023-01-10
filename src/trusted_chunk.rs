@@ -2,7 +2,7 @@ use prusti_contracts::*;
 use prusti_contracts::*;
 cfg_if::cfg_if! {
 if #[cfg(prusti)] {
-    use crate::spec::{
+    use crate::external_spec::{
         trusted_option::*,
         trusted_result::*,
         trusted_range_inclusive::*,

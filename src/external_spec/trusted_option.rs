@@ -1,5 +1,5 @@
 use prusti_contracts::*;
-use crate::spec::trusted_range_inclusive::*;
+use crate::external_spec::trusted_range_inclusive::*;
 
 #[extern_spec]
 impl<T> core::option::Option<T> {

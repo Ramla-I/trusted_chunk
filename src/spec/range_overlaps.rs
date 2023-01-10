@@ -1,10 +1,14 @@
+//! This function defines what it means for two RangeInclusives to overlap. 
+//! It is used in both the implementation and specification (not sure how to work around that).
+//! If this definition of overlapping doesn't match what the rest of the system expects, then the results of verification won't make sense.
+//! 
 //! To Do: Finalize relationship between overlapping and empty ranges.
 //! Right now an empty range will never overlap with another even if the actual numbers do overlap
 
 use prusti_contracts::*;
 cfg_if::cfg_if! {
 if #[cfg(prusti)] {
-    use crate::spec::trusted_range_inclusive::*;
+    use crate::external_spec::trusted_range_inclusive::*;
 } else {
     use range_inclusive::*;
 }

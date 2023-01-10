@@ -5,19 +5,10 @@
 
 #[macro_use]
 extern crate prusti_contracts;
-use prusti_contracts::*;
-
 extern crate cfg_if;
 extern crate core;
-use core::ops::{Deref};
-use crate::{
-    linked_list::*,
-    // memory_structs::*,
-    // trusted_chunk::*
-};
-
 // mod memory_structs;
-pub(crate) mod range_overlaps;
+pub(crate) mod spec;
 pub(crate) mod linked_list;
 mod trusted_chunk;
 mod static_array;
@@ -26,8 +17,8 @@ mod static_array_linked_list;
 
 cfg_if::cfg_if! {
 if #[cfg(prusti)] {
-    pub(crate) mod spec;
-    use crate::spec::{
+    pub(crate) mod external_spec;
+    use crate::external_spec::{
         trusted_range_inclusive::*,
         trusted_option::*,
         trusted_result::*,
@@ -37,6 +28,17 @@ if #[cfg(prusti)] {
     use range_inclusive::*;
 }
 }
+
+use prusti_contracts::*;
+use core::ops::Deref;
+use crate::{
+    linked_list::*,
+    // memory_structs::*,
+    // trusted_chunk::*
+};
+
+
+
 
 
 /*** Constants taken from kernel_config crate. Only required if CHECK_OVERFLOWS flag is enabled. ***/ 

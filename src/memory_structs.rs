@@ -1,6 +1,6 @@
 cfg_if::cfg_if! {
 if #[cfg(prusti)] {
-    use crate::spec::trusted_range_inclusive::*;
+    use crate::external_spec::trusted_range_inclusive::*;
 } else {
     use range_inclusive::*;
 }

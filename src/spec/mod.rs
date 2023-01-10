@@ -1,8 +1,4 @@
-//! The spec files are specifications of commonly used types like Option, Result, RangeInclusive.
-//! The specs are simple and easy to understand, and only the subset of functions used in the verification are specified.
-//! It is expected that these types are only used during verification, and the actual crates will be used when running the application.
-//! For that, we use conditional compilation.
+//! The spec files are specifications of functions that are used within both specifications and code.
+//! They are used to define what functional correctness means in this system.
 
-pub(crate) mod trusted_range_inclusive;
-pub(crate) mod trusted_option;
-pub(crate) mod trusted_result;
+pub(crate) mod range_overlaps;

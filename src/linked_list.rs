@@ -5,7 +5,7 @@
 use prusti_contracts::*;
 cfg_if::cfg_if! {
 if #[cfg(prusti)] {
-    use crate::spec::{
+    use crate::external_spec::{
         trusted_option::*,
         trusted_result::*,
         trusted_range_inclusive::*,
@@ -15,7 +15,7 @@ if #[cfg(prusti)] {
 }
 }
 
-use crate::range_overlaps::*;
+use crate::spec::range_overlaps::*;
 use core::{
     mem,
     marker::Copy,
