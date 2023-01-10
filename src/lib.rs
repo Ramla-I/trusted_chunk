@@ -1,49 +1,59 @@
 #![feature(box_patterns)]
 #![allow(unused)]
 #![feature(step_trait)]
-// #[cfg(feature="prusti")]
+#![feature(rustc_private)]
+
 #[macro_use]
 extern crate prusti_contracts;
-
-// #[cfg(feature="prusti")]
 use prusti_contracts::*;
 
+extern crate cfg_if;
+extern crate core;
 use core::ops::{Deref};
 use crate::{
     linked_list::*,
-    trusted_range_inclusive::*,
-    trusted_option::*,
-	trusted_result::*,
-    memory_structs::*,
-    trusted_chunk::*
+    // memory_structs::*,
+    // trusted_chunk::*
 };
 
+// mod memory_structs;
+pub(crate) mod range_overlaps;
 pub(crate) mod linked_list;
-pub(crate) mod trusted_range_inclusive;
-pub(crate) mod trusted_option;
-pub(crate) mod trusted_result;
-mod test;
-mod memory_structs;
 mod trusted_chunk;
-
+// mod test;
 // mod static_array;
 // mod static_array_linked_list;
 
+cfg_if::cfg_if! {
+if #[cfg(prusti)] {
+    pub(crate) mod spec;
+    use crate::spec::{
+        trusted_range_inclusive::*,
+        trusted_option::*,
+        trusted_result::*,
+    };
+} else {
+    extern crate range_inclusive;
+    use range_inclusive::*;
+}
+}
+
+
 /*** Constants taken from kernel_config crate. Only required if CHECK_OVERFLOWS flag is enabled. ***/ 
 /// The lower 12 bits of a virtual address correspond to the P1 page frame offset. 
-const PAGE_SHIFT: usize = 12;
+pub const PAGE_SHIFT: usize = 12;
 /// Page size is 4096 bytes, 4KiB pages.
-const PAGE_SIZE: usize = 1 << PAGE_SHIFT;
-const MAX_VIRTUAL_ADDRESS: usize = usize::MAX;
-const MAX_PAGE_NUMBER: usize = MAX_VIRTUAL_ADDRESS / PAGE_SIZE;
+pub const PAGE_SIZE: usize = 1 << PAGE_SHIFT;
+pub const MAX_VIRTUAL_ADDRESS: usize = usize::MAX;
+pub const MAX_PAGE_NUMBER: usize = MAX_VIRTUAL_ADDRESS / PAGE_SIZE;
 
+// cfg_if::cfg_if! {
+// if #[cfg(not(prusti))] {
 
-// /// A trusted function that will create a new `TrustedChunk` and add it to the `chunk_list`.
+//     /// A trusted function that will create a new `TrustedChunk` and add it to the `chunk_list`.
 // /// It will return an Err if:
 // /// * range.start > range.end
 // /// * there is an overlap with an existing chunk
-// // #[cfg_attr(feature="prusti", trusted)]
-// #[trusted]
 // pub fn create_new_trusted_chunk(range: FrameRange, typ: MemoryRegionType, chunk_list: &mut List) -> Result<Chunk, &'static str> {
 //     if range.start() > range.end() {
 //         return Err("Invalid range, start > end");
@@ -84,6 +94,7 @@ const MAX_PAGE_NUMBER: usize = MAX_VIRTUAL_ADDRESS / PAGE_SIZE;
 // //     Ok(list)
 // // }
 
+
 // pub struct Chunk {
 //     /// The type of this memory chunk, e.g., whether it's in a free or reserved region.
 //     typ: MemoryRegionType,
@@ -91,6 +102,7 @@ const MAX_PAGE_NUMBER: usize = MAX_VIRTUAL_ADDRESS / PAGE_SIZE;
 //     frames: FrameRange,
 // }
 
+// // #[cfg(not(prusti))]
 // impl Chunk {
 //     #[trusted]
 //     fn from_trusted(tchunk: TrustedChunk, start_frame: Frame, end_frame: Frame, typ: MemoryRegionType) -> Result<Self, &'static str> {
@@ -111,6 +123,8 @@ const MAX_PAGE_NUMBER: usize = MAX_VIRTUAL_ADDRESS / PAGE_SIZE;
 //     //         .and_then(||)
 
 //     // }
+// }
+// }
 // }
 
 // /// Types of physical memory. See each variant's documentation.

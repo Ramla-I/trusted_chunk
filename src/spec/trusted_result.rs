@@ -1,10 +1,6 @@
-/// Don't have to write an extern spec for Result because it's already in prusti_contracts
+//! Don't have to write an extern spec for Result because it's already in prusti_contracts
 
-// #[cfg(feature="prusti")]
 use prusti_contracts::*;
-
-use crate::trusted_range_inclusive::*;
-use crate::*;
 
 #[pure]
 #[requires(val.is_ok())]

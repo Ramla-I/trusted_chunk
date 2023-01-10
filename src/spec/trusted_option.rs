@@ -1,8 +1,6 @@
-// #[cfg(feature="prusti")]
 use prusti_contracts::*;
+use crate::spec::trusted_range_inclusive::*;
 
-use crate::trusted_range_inclusive::*;
-// #[cfg(feature="prusti")]
 #[extern_spec]
 impl<T> core::option::Option<T> {
     #[pure]

@@ -1,15 +1,21 @@
 //! Most of the List code is taken from the Prusti user guide 
 //! https://viperproject.github.io/prusti-dev/user-guide/tour/summary.html
 
-// #[cfg(feature="prusti")]
-use prusti_contracts::*;
 
-use crate::{
-    trusted_option::*,
-    trusted_result::*,
-    trusted_range_inclusive::*,
-    memory_structs::*
-};
+use prusti_contracts::*;
+cfg_if::cfg_if! {
+if #[cfg(prusti)] {
+    use crate::spec::{
+        trusted_option::*,
+        trusted_result::*,
+        trusted_range_inclusive::*,
+    };
+} else {
+    use range_inclusive::*;
+}
+}
+
+use crate::range_overlaps::*;
 use core::{
     mem,
     marker::Copy,

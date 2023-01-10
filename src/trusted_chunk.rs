@@ -1,12 +1,20 @@
 use prusti_contracts::*;
-
+use prusti_contracts::*;
+cfg_if::cfg_if! {
+if #[cfg(prusti)] {
+    use crate::spec::{
+        trusted_option::*,
+        trusted_result::*,
+        trusted_range_inclusive::*,
+    };
+} else {
+    use range_inclusive::*;
+}
+}
 use core::ops::{Deref};
 use crate::{
     *,
     linked_list::*,
-    trusted_range_inclusive::*,
-    trusted_option::*,
-	trusted_result::*,
 };
 
 /// A struct representing a unique unallocated region in memory.
