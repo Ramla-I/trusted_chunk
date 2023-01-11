@@ -132,44 +132,13 @@ impl TrustedChunk {
         *self.frames.end()
     }
 
-
-    /// Creates a new `TrustedChunk` iff no other chunk in the system overlaps with it, and adds the newly created chunk range to `chunk_list`.
-    /// Returns None if there is an overlap.
-    /// 
-    /// Ideally, this function should also contain postconditions about no overlap with any chunk in the existing list,
-    /// but Prusti starts giving errors at this level.
-    /// For now, this function is easy to manually inspect and all List functions are formally verified.
-    // #[cfg_attr(feature="prusti", requires(frames.start <= frames.end))]
-    // #[cfg_attr(feature="prusti", ensures(result.is_some() ==> peek_chunk(&result).frames.start == frames.start))]
-    // #[cfg_attr(feature="prusti", ensures(result.is_some() ==> peek_chunk(&result).frames.end == frames.end))]
-    // #[trusted]
+    /// If no other range in `chunk_list` overlaps with `frames`:
+    /// * creates a new `TrustedChunk` with `frames`  
+    /// * adds the range of the newly created `TrustedChunk` to `chunk_list`.
+    /// Returns an Err if there is an overlap, with the error value being the index in `chunk_list` of the element which overlaps with `frames`.
     #[requires(*frames.start() <= *frames.end())]
-    #[ensures(result.is_some() ==> *peek_option_ref(&result).frames.start() == *frames.start())]
-    #[ensures(result.is_some() ==> *peek_option_ref(&result).frames.end() == *frames.end())]
-    pub(crate) fn new(frames: RangeInclusive<usize>, chunk_list: &mut List) -> Option<TrustedChunk> {
-        if Self::add_chunk_to_list(frames, chunk_list).is_ok() {
-            Some(TrustedChunk { frames })
-        } else {
-            None
-        }
-    }
-
-    // / A trusted function that adds `frames` to the `chunk_list`  and returns true only if
-    // / there is no overlap with any range in the list.
-    // / 
-    // / Ideally, this function should not be trusted, and instead should be verified with the same postconditions as in push()
-    // / and range_overlaps_in_list().
-    // / Unfortunately, Prusti starts giving errors at this level.
-    // / For now, this function is easy to manually inspect and all List functions are formally verified.
-    // #[cfg_attr(feature="prusti", trusted)]
-    // // #[trusted]
-    // #[ensures(result ==> chunk_list.len() == old(chunk_list.len()) + 1)] 
-    // #[ensures(result ==> chunk_list.lookup(0) == frames)]
-    // #[ensures(result ==> forall(|i: usize| (1 <= i && i < chunk_list.len()) ==> old(chunk_list.lookup(i-1)) == chunk_list.lookup(i)))]
-    // #[ensures(old(chunk_list).range_overlaps_in_list(frames, 0).is_none() ==> result)]
-    // #[ensures(!result ==> chunk_list.len() == old(chunk_list.len()))] 
-    // #[ensures(!result ==> forall(|i: usize| (1 <= i && i < chunk_list.len()) ==> old(chunk_list.lookup(i)) == chunk_list.lookup(i)))]
-    // #[ensures(!result ==> exists(|i: usize| (0 <= i && i < chunk_list.len()) ==> chunk_list.lookup(i)))]
+    #[ensures(result.is_ok() ==> peek_result_ref(&result).start() == *frames.start())]
+    #[ensures(result.is_ok() ==> peek_result_ref(&result).end() == *frames.end())]
     #[ensures(result.is_err() ==> {
         let overlap_idx = peek_err(&result);
         overlap_idx < chunk_list.len()
@@ -185,13 +154,17 @@ impl TrustedChunk {
     #[ensures(result.is_ok() ==> {
         forall(|i: usize| (0 <= i && i < old(chunk_list.len())) ==> !range_overlaps(&old(chunk_list.lookup(i)), &frames))
     })]
-    fn add_chunk_to_list(frames: RangeInclusive<usize>, chunk_list: &mut List) -> Result<(), usize> {
+    #[ensures(result.is_ok() ==> chunk_list.len() == old(chunk_list.len()) + 1)] 
+    #[ensures(result.is_ok() ==> {
+        forall(|i: usize| (1 <= i && i < chunk_list.len()) ==> old(chunk_list.lookup(i-1)) == chunk_list.lookup(i))
+    })]
+    fn new(frames: RangeInclusive<usize>, chunk_list: &mut List) -> Result<TrustedChunk, usize> {
         let overlap_idx = chunk_list.elem_overlaps_in_list(frames, 0);
         if overlap_idx.is_some(){
             Err(overlap_idx.unwrap())
         } else {
             chunk_list.push(frames);
-            Ok(())
+            Ok(TrustedChunk { frames })
         }
     }
 
