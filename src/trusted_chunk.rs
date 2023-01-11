@@ -14,8 +14,96 @@ if #[cfg(prusti)] {
 use core::ops::{Deref};
 use crate::{
     *,
-    linked_list::*,
+    linked_list::*, spec::range_overlaps::range_overlaps,
 };
+
+// pub fn create_initial_trusted_chunk_arrays(free_list: [Option<RangeInclusive<usize>>; 32], reserved_list: [Option<RangeInclusive<usize>>; 32]) -> Result<([Option<TrustedChunk>; 32], [Option<TrustedChunk>; 32]), ()> {
+//     let mut free_chunks = 
+//         [None, None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+//         None, None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+//         None, None];
+//     let mut reserved_chunks = 
+//         [None, None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+//         None, None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+//         None, None];
+    
+//     let mut i = 0;
+
+//     while i < 32 {
+//         body_invariant!(i < free_list.len());
+//         body_invariant!(i >= 0);
+
+//         if free_list[i].is_some() {
+//             let elem = free_list[i].unwrap();
+//             let mut j = i + 1;
+//             while j < 32 {
+//                 body_invariant!(j < free_list.len());
+//                 body_invariant!(j >= 0);
+//                 if free_list[j].is_some(){
+//                     if range_overlaps(&elem, &free_list[j].unwrap()) {
+//                         return Err(())
+//                     } 
+//                 }
+//                 j += 1;
+//             }
+
+//             let mut k= 0;
+//             while k < 32 {
+//                 body_invariant!(k < reserved_list.len());
+//                 body_invariant!(k >= 0);
+//                 if reserved_list[k].is_some(){
+//                     if range_overlaps(&elem, &reserved_list[k].unwrap()) {
+//                         return Err(())
+//                     } 
+//                 }
+//                 k += 1;
+//             }
+
+//             free_chunks[i] = Some(TrustedChunk{ frames: free_list[i].unwrap() });
+//         }
+//         i += 1;
+//     }
+
+//     let mut i = 0;
+
+//     while i < 32 {
+//         body_invariant!(i < reserved_list.len());
+//         body_invariant!(i >= 0);
+
+//         if reserved_list[i].is_some() {
+//             let elem = reserved_list[i].unwrap();
+//             let mut j = i + 1;
+//             while j < 32 {
+//                 body_invariant!(j < reserved_list.len());
+//                 body_invariant!(j >= 0);
+//                 if reserved_list[j].is_some(){
+//                     if range_overlaps(&elem, &reserved_list[j].unwrap()) {
+//                         return Err(())
+//                     } 
+//                 }
+//                 j += 1;
+//             }
+
+//             // let mut k= 0;
+//             // while k < 32 {
+//             //     body_invariant!(k < reserved_list.len());
+//             //     body_invariant!(k >= 0);
+//             //     if reserved_list[k].is_some(){
+//             //         if range_overlaps(&elem, &reserved_list[k].unwrap()) {
+//             //             return Err(())
+//             //         } 
+//             //     }
+//             //     k += 1;
+//             // }
+
+//             reserved_chunks[i] = Some(TrustedChunk{ frames: reserved_list[i].unwrap() });
+//         }
+//         i += 1;
+//     }
+
+//     Ok((free_chunks, reserved_chunks))
+// }
+
 
 /// A struct representing a unique unallocated region in memory.
 /// An instantiation of this struct is formally verified to not overlap with any other `TrustedChunk` in the system.
@@ -59,7 +147,7 @@ impl TrustedChunk {
     #[ensures(result.is_some() ==> *peek_option_ref(&result).frames.start() == *frames.start())]
     #[ensures(result.is_some() ==> *peek_option_ref(&result).frames.end() == *frames.end())]
     pub(crate) fn new(frames: RangeInclusive<usize>, chunk_list: &mut List) -> Option<TrustedChunk> {
-        if Self::add_chunk_to_list(frames, chunk_list) {
+        if Self::add_chunk_to_list(frames, chunk_list).is_ok() {
             Some(TrustedChunk { frames })
         } else {
             None
@@ -74,20 +162,36 @@ impl TrustedChunk {
     // / Unfortunately, Prusti starts giving errors at this level.
     // / For now, this function is easy to manually inspect and all List functions are formally verified.
     // #[cfg_attr(feature="prusti", trusted)]
-    // #[trusted]
-    #[ensures(result ==> chunk_list.len() == old(chunk_list.len()) + 1)] 
-    #[ensures(result ==> chunk_list.lookup(0) == frames)]
-    #[ensures(result ==> forall(|i: usize| (1 <= i && i < chunk_list.len()) ==> old(chunk_list.lookup(i-1)) == chunk_list.lookup(i)))]
+    // // #[trusted]
+    // #[ensures(result ==> chunk_list.len() == old(chunk_list.len()) + 1)] 
+    // #[ensures(result ==> chunk_list.lookup(0) == frames)]
+    // #[ensures(result ==> forall(|i: usize| (1 <= i && i < chunk_list.len()) ==> old(chunk_list.lookup(i-1)) == chunk_list.lookup(i)))]
     // #[ensures(old(chunk_list).range_overlaps_in_list(frames, 0).is_none() ==> result)]
-    #[ensures(!result ==> chunk_list.len() == old(chunk_list.len()))] 
-    #[ensures(!result ==> forall(|i: usize| (1 <= i && i < chunk_list.len()) ==> old(chunk_list.lookup(i)) == chunk_list.lookup(i)))]
+    // #[ensures(!result ==> chunk_list.len() == old(chunk_list.len()))] 
+    // #[ensures(!result ==> forall(|i: usize| (1 <= i && i < chunk_list.len()) ==> old(chunk_list.lookup(i)) == chunk_list.lookup(i)))]
     // #[ensures(!result ==> exists(|i: usize| (0 <= i && i < chunk_list.len()) ==> chunk_list.lookup(i)))]
-    fn add_chunk_to_list(frames: RangeInclusive<usize>, chunk_list: &mut List) -> bool {
-        if chunk_list.elem_overlaps_in_list(frames, 0).is_some(){
-            false
+    #[ensures(result.is_err() ==> {
+        let overlap_idx = peek_err(&result);
+        overlap_idx < chunk_list.len()
+    })]
+    #[ensures(result.is_err() ==> {
+        let overlap_idx = peek_err(&result);
+        range_overlaps(&chunk_list.lookup(overlap_idx), &frames)
+    })]
+    #[ensures(result.is_ok() ==> chunk_list.len() >= 1)]
+    #[ensures(result.is_ok() ==> {
+        chunk_list.lookup(0) == frames
+    })]
+    #[ensures(result.is_ok() ==> {
+        forall(|i: usize| (0 <= i && i < old(chunk_list.len())) ==> !range_overlaps(&old(chunk_list.lookup(i)), &frames))
+    })]
+    fn add_chunk_to_list(frames: RangeInclusive<usize>, chunk_list: &mut List) -> Result<(), usize> {
+        let overlap_idx = chunk_list.elem_overlaps_in_list(frames, 0);
+        if overlap_idx.is_some(){
+            Err(overlap_idx.unwrap())
         } else {
             chunk_list.push(frames);
-            true
+            Ok(())
         }
     }
 

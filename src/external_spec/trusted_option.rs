@@ -2,7 +2,7 @@ use prusti_contracts::*;
 use crate::external_spec::trusted_range_inclusive::*;
 
 #[extern_spec]
-impl<T> core::option::Option<T> {
+impl<T: PartialEq + Copy> core::option::Option<T> {
     #[pure]
     #[ensures(matches!(*self, Some(_)) == result)]
     pub fn is_some(&self) -> bool;
@@ -12,6 +12,7 @@ impl<T> core::option::Option<T> {
     pub fn is_none(&self) -> bool;
 
     #[requires(self.is_some())]
+    #[ensures(result == peek_option(&self))]
     pub fn unwrap(self) -> T;
 }
 

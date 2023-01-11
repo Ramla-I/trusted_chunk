@@ -11,8 +11,6 @@ extern crate core;
 pub(crate) mod spec;
 pub(crate) mod linked_list;
 mod trusted_chunk;
-mod static_array;
-mod static_array_linked_list;
 // mod test;
 
 cfg_if::cfg_if! {
