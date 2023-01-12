@@ -17,92 +17,79 @@ use crate::{
     linked_list::*, spec::range_overlaps::range_overlaps,
 };
 
-// pub fn create_initial_trusted_chunk_arrays(free_list: [Option<RangeInclusive<usize>>; 32], reserved_list: [Option<RangeInclusive<usize>>; 32]) -> Result<([Option<TrustedChunk>; 32], [Option<TrustedChunk>; 32]), ()> {
-//     let mut free_chunks = 
-//         [None, None, None, None, None, None, None, None, None, None, None, None, None, None, None,
-//         None, None, None, None, None, None, None, None, None, None, None, None, None, None, None,
-//         None, None];
-//     let mut reserved_chunks = 
-//         [None, None, None, None, None, None, None, None, None, None, None, None, None, None, None,
-//         None, None, None, None, None, None, None, None, None, None, None, None, None, None, None,
-//         None, None];
-    
-//     let mut i = 0;
+#[ensures(result.is_some() ==> peek_option(&result) < 32)]
+#[ensures(result.is_some() ==> list[peek_option(&result)].is_some())]
+#[ensures(result.is_some() ==> {
+    let idx = peek_option(&result);
+    let elem = peek_option(&list[idx]);
+    range_overlaps(&range, &elem)
+}
+)]
+#[ensures(result.is_none() ==> 
+    forall(|i: usize| ((0 <= i && i < 32) && list[i].is_some()) ==> {
+        let elem = peek_option(&list[i]);
+        !range_overlaps(&range, &elem)
+    })
+)]
+pub fn range_overlaps_in_array(range: RangeInclusive<usize>, list: [Option<RangeInclusive<usize>>; 32]) -> Option<usize> {
+    let mut i = 0;
+    while i < 32 {
+        body_invariant!(i < list.len());
+        body_invariant!(i >= 0);
 
-//     while i < 32 {
-//         body_invariant!(i < free_list.len());
-//         body_invariant!(i >= 0);
+        if list[i].is_some(){
+            if range_overlaps(&range, &list[i].unwrap()) {
+                return Some(i);
+            }
+        }
+    }
+    None
+}
 
-//         if free_list[i].is_some() {
-//             let elem = free_list[i].unwrap();
-//             let mut j = i + 1;
-//             while j < 32 {
-//                 body_invariant!(j < free_list.len());
-//                 body_invariant!(j >= 0);
-//                 if free_list[j].is_some(){
-//                     if range_overlaps(&elem, &free_list[j].unwrap()) {
-//                         return Err(())
-//                     } 
-//                 }
-//                 j += 1;
-//             }
+#[ensures(result.is_some() ==> {
+    let (i,j) = peek_option(&result);
+    i < 32 && j < 32
+})]
+#[ensures(result.is_some() ==> {
+    let (i,j) = peek_option(&result);
+    list[i].is_some() && list[j].is_some()
+})]
 
-//             let mut k= 0;
-//             while k < 32 {
-//                 body_invariant!(k < reserved_list.len());
-//                 body_invariant!(k >= 0);
-//                 if reserved_list[k].is_some(){
-//                     if range_overlaps(&elem, &reserved_list[k].unwrap()) {
-//                         return Err(())
-//                     } 
-//                 }
-//                 k += 1;
-//             }
+#[ensures(result.is_some() ==> {
+    let (i,j) = peek_option(&result);
+    range_overlaps(peek_option_ref(&list[i]), peek_option_ref(&list[j]))
+}
+)]
+// #[ensures(result.is_none() ==> 
+//     forall(|i: usize, j:usize| ((0 <= i && i < 32 && i < j && j < 32) && list[i].is_some() && list[j].is_some()) ==> {
+//         let elem = peek_option(&list[i]);
+//         let range = peek_option(&list[j]);
+//         !range_overlaps(&range, &elem)
+//     })
+// )]
+pub fn overlaps_in_array(list: [Option<RangeInclusive<usize>>; 32]) -> Option<(usize, usize)> {
+    let mut i = 0;
+    while i < 32 {
+        body_invariant!(i < list.len());
+        body_invariant!(i >= 0);
 
-//             free_chunks[i] = Some(TrustedChunk{ frames: free_list[i].unwrap() });
-//         }
-//         i += 1;
-//     }
-
-//     let mut i = 0;
-
-//     while i < 32 {
-//         body_invariant!(i < reserved_list.len());
-//         body_invariant!(i >= 0);
-
-//         if reserved_list[i].is_some() {
-//             let elem = reserved_list[i].unwrap();
-//             let mut j = i + 1;
-//             while j < 32 {
-//                 body_invariant!(j < reserved_list.len());
-//                 body_invariant!(j >= 0);
-//                 if reserved_list[j].is_some(){
-//                     if range_overlaps(&elem, &reserved_list[j].unwrap()) {
-//                         return Err(())
-//                     } 
-//                 }
-//                 j += 1;
-//             }
-
-//             // let mut k= 0;
-//             // while k < 32 {
-//             //     body_invariant!(k < reserved_list.len());
-//             //     body_invariant!(k >= 0);
-//             //     if reserved_list[k].is_some(){
-//             //         if range_overlaps(&elem, &reserved_list[k].unwrap()) {
-//             //             return Err(())
-//             //         } 
-//             //     }
-//             //     k += 1;
-//             // }
-
-//             reserved_chunks[i] = Some(TrustedChunk{ frames: reserved_list[i].unwrap() });
-//         }
-//         i += 1;
-//     }
-
-//     Ok((free_chunks, reserved_chunks))
-// }
+        if list[i].is_some(){
+            let mut j = i+1;
+            while j < 32 {
+                body_invariant!(j < list.len());
+                body_invariant!(j >= 0);
+                if list[j].is_some(){
+                    if range_overlaps(&list[j].unwrap(), &list[i].unwrap()) {
+                        return Some((i,j));
+                    }
+                }
+                j += 1;
+            }
+        }
+        i += 1;
+    }
+    None
+}
 
 
 /// A struct representing a unique unallocated region in memory.
