@@ -14,10 +14,10 @@ if #[cfg(prusti)] {
 use core::ops::{Deref};
 use crate::{
     *,
-    linked_list::*, spec::range_overlaps::range_overlaps,
+    linked_list::*, spec::range_overlaps::range_overlaps, static_array::*,
 };
 
-#[ensures(result.is_some() ==> peek_option(&result) < 32)]
+#[ensures(result.is_some() ==> peek_option(&result) < list.len())]
 #[ensures(result.is_some() ==> list[peek_option(&result)].is_some())]
 #[ensures(result.is_some() ==> {
     let idx = peek_option(&result);
@@ -26,14 +26,14 @@ use crate::{
 }
 )]
 #[ensures(result.is_none() ==> 
-    forall(|i: usize| ((0 <= i && i < 32) && list[i].is_some()) ==> {
+    forall(|i: usize| ((0 <= i && i < list.len()) && list[i].is_some()) ==> {
         let elem = peek_option(&list[i]);
         !range_overlaps(&range, &elem)
     })
 )]
-pub fn range_overlaps_in_array(range: RangeInclusive<usize>, list: [Option<RangeInclusive<usize>>; 32]) -> Option<usize> {
+pub fn range_overlaps_in_array(range: RangeInclusive<usize>, list: [Option<RangeInclusive<usize>>; 64]) -> Option<usize> {
     let mut i = 0;
-    while i < 32 {
+    while i < list.len() {
         body_invariant!(i < list.len());
         body_invariant!(i >= 0);
 
@@ -46,51 +46,11 @@ pub fn range_overlaps_in_array(range: RangeInclusive<usize>, list: [Option<Range
     None
 }
 
-#[ensures(result.is_some() ==> {
-    let (i,j) = peek_option(&result);
-    i < 32 && j < 32
-})]
-#[ensures(result.is_some() ==> {
-    let (i,j) = peek_option(&result);
-    list[i].is_some() && list[j].is_some()
-})]
-
-#[ensures(result.is_some() ==> {
-    let (i,j) = peek_option(&result);
-    range_overlaps(peek_option_ref(&list[i]), peek_option_ref(&list[j]))
+#[derive(Copy, Clone)]
+pub enum ChunkCreationError {
+    Overlap(usize),
+    NoSpace
 }
-)]
-// #[ensures(result.is_none() ==> 
-//     forall(|i: usize, j:usize| ((0 <= i && i < 32 && i < j && j < 32) && list[i].is_some() && list[j].is_some()) ==> {
-//         let elem = peek_option(&list[i]);
-//         let range = peek_option(&list[j]);
-//         !range_overlaps(&range, &elem)
-//     })
-// )]
-pub fn overlaps_in_array(list: [Option<RangeInclusive<usize>>; 32]) -> Option<(usize, usize)> {
-    let mut i = 0;
-    while i < 32 {
-        body_invariant!(i < list.len());
-        body_invariant!(i >= 0);
-
-        if list[i].is_some(){
-            let mut j = i+1;
-            while j < 32 {
-                body_invariant!(j < list.len());
-                body_invariant!(j >= 0);
-                if list[j].is_some(){
-                    if range_overlaps(&list[j].unwrap(), &list[i].unwrap()) {
-                        return Some((i,j));
-                    }
-                }
-                j += 1;
-            }
-        }
-        i += 1;
-    }
-    None
-}
-
 
 /// A struct representing a unique unallocated region in memory.
 /// An instantiation of this struct is formally verified to not overlap with any other `TrustedChunk` in the system.
@@ -103,7 +63,6 @@ pub struct TrustedChunk {
 }
 
 impl TrustedChunk {
-    // #[cfg_attr(feature="prusti", pure)]
     #[pure]
     #[trusted]
     #[ensures(result == *self.frames.start())]
@@ -111,7 +70,6 @@ impl TrustedChunk {
         *self.frames.start()
     }
 
-    // #[cfg_attr(feature="prusti", pure)]
     #[pure]
     #[trusted]
     #[ensures(result == *self.frames.end())]
@@ -155,11 +113,47 @@ impl TrustedChunk {
         }
     }
 
+    #[requires(*frames.start() <= *frames.end())]
+    #[ensures(result.is_err() ==> {
+        match peek_err(&result) {
+            ChunkCreationError::Overlap(idx) => (idx < chunk_list.len()) && (chunk_list.lookup(idx).is_some()) && range_overlaps(&peek_option(&chunk_list.lookup(idx)), &frames),
+            ChunkCreationError::NoSpace => true
+        }
+    })]
+    #[ensures(result.is_ok() ==> peek_result_ref(&result).0.start() == *frames.start())]
+    #[ensures(result.is_ok() ==> peek_result_ref(&result).0.end() == *frames.end())]
+    #[ensures(result.is_ok() ==> {
+        peek_result_ref(&result).1 < chunk_list.len()
+    })]
+    #[ensures(result.is_ok() ==> {
+        let idx = peek_result_ref(&result).1;
+        chunk_list.lookup(idx).is_some()
+    })]
+    #[ensures(result.is_ok() ==> {
+        let idx = peek_result_ref(&result).1;
+        peek_option(&chunk_list.lookup(idx)) == frames
+    })]
+    #[ensures(result.is_ok() ==> 
+        forall(|i: usize| ((0 <= i && i < chunk_list.len()) && (i != peek_result_ref(&result).1)) ==> old(chunk_list.lookup(i)) == chunk_list.lookup(i))
+    )] 
+    #[ensures(result.is_ok() ==> 
+        forall(|i: usize| ((0 <= i && i < chunk_list.len()) && (i != peek_result_ref(&result).1)) && old(chunk_list.lookup(i)).is_some()
+            ==> !range_overlaps(&peek_option(&old(chunk_list.lookup(i))), &frames))
+    )] 
+    fn new_pre_heap(frames: RangeInclusive<usize>, chunk_list: &mut StaticArray) -> Result<(TrustedChunk, usize), ChunkCreationError> {
+        let overlap_idx = chunk_list.elem_overlaps_in_array(frames, 0);
+        if overlap_idx.is_some(){
+            Err(ChunkCreationError::Overlap(overlap_idx.unwrap()))
+        } else {
+            match chunk_list.push(frames){
+                Some(idx) => Ok((TrustedChunk { frames }, idx)),
+                None => Err(ChunkCreationError::NoSpace)
+            }
+        }
+    }
+
     /// Internal function that creates a chunk without any checks.
     /// Only to be used in the split() function.
-    // #[cfg_attr(feature="prusti", requires(frames.start <= frames.end))]
-    // #[cfg_attr(feature="prusti", ensures(result.frames.start == frames.start))]
-    // #[cfg_attr(feature="prusti", ensures(result.frames.end == frames.end))]
     #[requires(*frames.start() <= *frames.end())]
     #[ensures(result.start() == *frames.start())]
     #[ensures(result.end() == *frames.end())]
@@ -167,18 +161,9 @@ impl TrustedChunk {
         TrustedChunk{frames}
     }
 
+
     /// Splits a chunk in to 1-3 chunks, depending on where the split is at.
     /// It is formally verified that the resulting chunks are disjoint, contiguous and their start/end is equal to that of the original chunk.
-    // #[cfg_attr(feature="prusti", requires(start_page >= self.frames.start))]
-    // #[cfg_attr(feature="prusti", requires(start_page + num_frames - 1 <= self.frames.end))]
-    // #[cfg_attr(feature="prusti", requires(num_frames > 0))]
-    // // #[cfg_attr(feature="prusti", requires(self.frames.end <= MAX_PAGE_NUMBER))]
-    // #[cfg_attr(feature="prusti", ensures(split_chunk_has_no_overlapping_ranges(&result.0, &result.1, &result.2)))]
-    // #[cfg_attr(feature="prusti", ensures(split_chunk_is_contiguous(&result.0, &result.1, &result.2)))]
-    // #[cfg_attr(feature="prusti", ensures(start_end_are_equal(&self, &result)))]
-    // #[requires(start_page >= self.frames.start)]
-    // #[requires(start_page + num_frames - 1 <= self.frames.end)]
-    // #[requires(num_frames > 0)]
     #[ensures(result.is_ok() ==> {
         let split_chunk = peek_result_ref(&result);
         split_chunk_has_no_overlapping_ranges(&split_chunk.0, &split_chunk.1, &split_chunk.2)
@@ -212,6 +197,7 @@ impl TrustedChunk {
 
         Ok((first_chunk, second_chunk, third_chunk))
     }
+
 
     #[ensures(result.is_ok() ==> 
         (old(self.start()) == other.end() + 1 && self.start() == other.start() && self.end() == old(self.end())) 

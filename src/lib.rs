@@ -10,6 +10,7 @@ extern crate core;
 // mod memory_structs;
 pub(crate) mod spec;
 pub(crate) mod linked_list;
+pub(crate) mod static_array;
 mod trusted_chunk;
 // mod test;
 

@@ -38,12 +38,6 @@ pub(crate) struct Node {
 }
 
 
-// #[cfg_attr(feature="prusti", trusted)]
-// #[cfg_attr(feature="prusti", requires(src.is_empty()))]
-// #[cfg_attr(feature="prusti", ensures(dest.is_empty()))]
-// #[cfg_attr(feature="prusti", ensures(old(dest.len()) == result.len()))]
-// #[cfg_attr(feature="prusti", ensures(forall(|i: usize| (0 <= i && i < result.len()) ==> 
-//                 old(dest.lookup(i)) == result.lookup(i))))] 
 #[trusted]
 #[requires(src.is_empty())]
 #[ensures(dest.is_empty())]
@@ -65,8 +59,6 @@ impl List {
 
     /// Looks up an element in the list.
     /// Requires that the index is within range. 
-    // #[cfg_attr(feature="prusti", pure)]
-    // #[cfg_attr(feature="prusti", requires(0 <= index && index < self.len()))]
     #[pure]
     #[requires(0 <= index && index < self.len())]
     pub fn lookup(&self, index: usize) -> RangeInclusive<usize> {
