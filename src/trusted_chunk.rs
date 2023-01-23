@@ -11,7 +11,7 @@ if #[cfg(prusti)] {
     use range_inclusive::*;
 }
 }
-use core::ops::{Deref};
+use core::ops::{Deref, DerefMut};
 use crate::{
     *,
     linked_list::*, 
@@ -69,6 +69,8 @@ pub enum ChunkCreationError {
 pub struct TrustedChunk {
     frames: RangeInclusive<usize>
 }
+
+// assert_not_impl_any!(TrustedChunk: DerefMut, Clone);
 
 impl TrustedChunk {
     #[pure]

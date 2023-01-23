@@ -7,6 +7,8 @@
 extern crate prusti_contracts;
 extern crate cfg_if;
 extern crate core;
+// #[macro_use]
+// extern crate static_assertions;
 // mod memory_structs;
 pub(crate) mod spec;
 pub(crate) mod linked_list;
