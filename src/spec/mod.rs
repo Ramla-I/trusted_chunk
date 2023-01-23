@@ -2,3 +2,4 @@
 //! They are used to define what functional correctness means in this system.
 
 pub(crate) mod range_overlaps;
+pub(crate) mod chunk_spec;

@@ -51,7 +51,6 @@ fn replace(dest: &mut Link, src: Link) -> Link {
 
 impl List {
 
-    // #[cfg_attr(feature="prusti", pure)]
     #[pure]
     pub fn len(&self) -> usize {
         self.head.len()
@@ -67,7 +66,6 @@ impl List {
 
     /// Creates an empty list.
     /// Ensures that the length is zero.
-    // #[cfg_attr(feature="prusti", ensures(result.len() == 0))]
     #[ensures(result.len() == 0)]
     pub fn new() -> Self {
         List { head: Link::Empty }
@@ -78,10 +76,6 @@ impl List {
     /// * new_length = old_length + 1
     /// * `elem` is added at index 0
     /// * all previous elements remain in the list, just moved one index forward
-    // #[cfg_attr(feature="prusti", ensures(self.len() == old(self.len()) + 1))] 
-    // #[cfg_attr(feature="prusti", ensures(self.lookup(0) == elem))]
-    // #[cfg_attr(feature="prusti", ensures(forall(|i: usize| (1 <= i && i < self.len()) ==>
-    //     old(self.lookup(i-1)) == self.lookup(i))))]
     #[ensures(self.len() == old(self.len()) + 1)] 
     #[ensures(self.lookup(0) == elem)]
     #[ensures(forall(|i: usize| (1 <= i && i < self.len()) ==> old(self.lookup(i-1)) == self.lookup(i)))]
@@ -124,6 +118,7 @@ impl List {
         }
     }
 
+
     #[requires(forall(|i: usize, j: usize| (0 <= i && i < self.len() && 0 <= j && j < self.len()) ==> 
         (i != j ==> !range_overlaps(&self.lookup(i), &self.lookup(j))))
     )]
@@ -153,6 +148,7 @@ impl List {
         }
     }
 
+    
     /// Removes element at index 0 from the list
     /// Ensures that:
     /// * if the list is empty, returns None.
@@ -161,14 +157,6 @@ impl List {
     /// * if the list is not empty, new_length = old_length - 1
     /// * if the list is not empty, the returned element was previously at index 0
     /// * if the list is not empty, all elements in the old list at index [1..] are still in the list, except at one index less.
-    // #[cfg_attr(feature="prusti", ensures(old(self.len()) == 0 ==> result.is_none()))]
-    // #[cfg_attr(feature="prusti", ensures(old(self.len()) > 0 ==> result.is_some()))]
-    // #[cfg_attr(feature="prusti", ensures(old(self.len()) == 0 ==> self.len() == 0))]
-    // #[cfg_attr(feature="prusti", ensures(old(self.len()) > 0 ==> self.len() == old(self.len()-1)))]
-    // #[cfg_attr(feature="prusti", ensures(old(self.len()) > 0 ==> peek_range(&result) == old(self.lookup(0))))]
-    // #[cfg_attr(feature="prusti", ensures(old(self.len()) > 0 ==>
-    // forall(|i: usize| (0 <= i && i < self.len()) ==>
-    //     old(self.lookup(i+1)) == self.lookup(i))))]
     #[ensures(old(self.len()) == 0 ==> result.is_none())]
     #[ensures(old(self.len()) > 0 ==> result.is_some())]
     #[ensures(old(self.len()) == 0 ==> self.len() == 0)]
@@ -218,29 +206,6 @@ impl List {
     /// * if the result is Some(idx), then idx lies within the list's length.
     /// * if the result is Some(idx), then the element at idx overlaps with `elem`
     /// * if the result is None, then no element in the lists overlaps with `elem`
-    /// 
-    /// # Warning
-    /// Only returns an accurate index if argument `index` is 0
-    // #[cfg_attr(feature="prusti", pure)]
-    // #[cfg_attr(feature="prusti", requires(0 <= index && index <= self.len()))]
-    // #[cfg_attr(feature="prusti", ensures(result.is_some() ==> peek_usize(&result) < self.len()))]
-    // #[cfg_attr(feature="prusti", ensures(result.is_some() ==> {
-    //         let idx = peek_usize(&result);
-    //         let range = self.lookup(idx);
-    //         ((range.end >= elem.start) && (range.start <= elem.end)) 
-    //         || 
-    //         ((elem.end >= range.start) && (elem.start <= range.end))
-    //     }
-    // ))]
-    // #[cfg_attr(feature="prusti", ensures(result.is_none() ==> 
-    //     forall(|i: usize| (index <= i && i < self.len()) ==> {
-    //         let range = self.lookup(i);
-    //         !(((range.end >= elem.start) && (range.start <= elem.end)) 
-    //         || 
-    //         ((elem.end >= range.start) && (elem.start <= range.end)))
-    //     })
-    // ))]
-    // #[pure]
     #[requires(0 <= index && index <= self.len())]
     #[ensures(result.is_some() ==> peek_option(&result) < self.len())]
     #[ensures(result.is_some() ==> {
@@ -271,9 +236,6 @@ impl List {
 
 impl Link {
 
-    // #[cfg_attr(feature="prusti", pure)]
-    // #[cfg_attr(feature="prusti", ensures(self.is_empty() ==> result == 0))]
-    // #[cfg_attr(feature="prusti", ensures(!self.is_empty() ==> result > 0))]
     #[pure]
     #[ensures(self.is_empty() ==> result == 0)]
     #[ensures(!self.is_empty() ==> result > 0)]
@@ -284,7 +246,6 @@ impl Link {
         }
     }
 
-    // #[cfg_attr(feature="prusti", pure)]
     #[pure]
     fn is_empty(&self) -> bool {
         match self {
@@ -293,8 +254,6 @@ impl Link {
         }
     }
 
-    // #[cfg_attr(feature="prusti", pure)]
-    // #[cfg_attr(feature="prusti", requires(0 <= index && index < self.len()))]
     #[pure]
     #[requires(0 <= index && index < self.len())]
     pub fn lookup(&self, index: usize) -> RangeInclusive<usize> {

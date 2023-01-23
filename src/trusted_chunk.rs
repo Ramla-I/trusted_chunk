@@ -14,8 +14,15 @@ if #[cfg(prusti)] {
 use core::ops::{Deref};
 use crate::{
     *,
-    linked_list::*, spec::range_overlaps::range_overlaps, static_array::*,
+    linked_list::*, 
+    spec::{
+        range_overlaps::range_overlaps,
+        chunk_spec::*
+    },
+    static_array::*,
 };
+
+
 
 #[ensures(result.is_some() ==> peek_option(&result) < list.len())]
 #[ensures(result.is_some() ==> list[peek_option(&result)].is_some())]
@@ -46,6 +53,7 @@ pub fn range_overlaps_in_array(range: RangeInclusive<usize>, list: [Option<Range
     None
 }
 
+
 #[derive(Copy, Clone)]
 pub enum ChunkCreationError {
     Overlap(usize),
@@ -75,6 +83,10 @@ impl TrustedChunk {
     #[ensures(result == *self.frames.end())]
     pub fn end(&self) -> usize {
         *self.frames.end()
+    }
+
+    pub fn frames(&self) -> RangeInclusive<usize> {
+        self.frames
     }
 
     /// If no other range in `chunk_list` overlaps with `frames`:
@@ -199,6 +211,8 @@ impl TrustedChunk {
     }
 
 
+    /// Merges `other` into `self`.
+    /// Succeeds if `other` lies right before `self` or right after.
     #[ensures(result.is_ok() ==> 
         (old(self.start()) == other.end() + 1 && self.start() == other.start() && self.end() == old(self.end())) 
         || 
@@ -225,7 +239,7 @@ impl TrustedChunk {
             return Err(other);
         }
 
-        // ensure the now-merged AllocatedFrames doesn't run its drop handler and free its frames.
+        // ensure the now-merged TrustedChunk doesn't run its drop handler (currently not implemented, but to prevent any future issues.)
         core::mem::forget(other); 
         Ok(())
     }
@@ -237,105 +251,5 @@ impl Deref for TrustedChunk {
     #[pure]
     fn deref(&self) -> &RangeInclusive<usize> {
         &self.frames
-    }
-}
-
-
-/*** Following are a set of pure functions that are only used in the specification of a TrustedChunk ***/
-
-/// Checks that either chunk1 ends before chunk2 starts, or that chunk2 ends before chunk1 starts.
-// #[cfg_attr(feature="prusti", pure)]
-#[pure]
-fn chunks_do_not_overlap(chunk1: &TrustedChunk, chunk2: &TrustedChunk) -> bool {
-    (chunk1.end() < chunk2.start()) | (chunk2.end() < chunk1.start())
-}
-
-/// Returns true if there is no overlap in the ranges of `chunk1`, `chunk2` and `chunk3`.
-// #[cfg_attr(feature="prusti", pure)]
-#[pure]
-fn split_chunk_has_no_overlapping_ranges(chunk1: &Option<TrustedChunk>, chunk2: &TrustedChunk, chunk3: &Option<TrustedChunk>) -> bool {
-    let mut no_overlap = true;
-
-    if let Some(c1) = chunk1 {
-        no_overlap &= chunks_do_not_overlap(c1, chunk2);
-        if let Some(c3) = chunk3 {
-            no_overlap &= chunks_do_not_overlap(c1, c3);
-            no_overlap &= chunks_do_not_overlap(chunk2, c3);
-        }
-    } else {
-        if let Some(c3) = chunk3 {
-            no_overlap &= chunks_do_not_overlap(chunk2, c3);
-        }
-    }
-
-    no_overlap
-}
-
-/// Returns true if the start and end of the original chunk is equal to the extreme bounds of the split chunk.
-// #[cfg_attr(feature="prusti", pure)]
-#[pure]
-fn split_chunk_has_same_range(orig_chunk: &TrustedChunk, split_chunk: &(Option<TrustedChunk>, TrustedChunk, Option<TrustedChunk>)) -> bool {
-    let (chunk1,chunk2,chunk3) = split_chunk;
-    let min_page;
-    let max_page;
-
-    if let Some(c1) = chunk1 {
-        min_page = c1.start();    
-    } else {
-        min_page = chunk2.start();
-    }
-
-    if let Some(c3) = chunk3 {
-        max_page = c3.end();    
-    } else {
-        max_page = chunk2.end();
-    }
-
-    min_page == orig_chunk.start() && max_page == orig_chunk.end()
-}
-
-
-/// Returns true if `chunk1`, `chunk2` and `chunk3` are contiguous.
-// #[cfg_attr(feature="prusti", pure)]
-#[pure]
-// The following are only required if CHECK_OVERFLOWS flag is enabled
-// #[cfg_attr(feature="prusti", requires(end_frame_is_less_than_max_or_none(chunk1)))]
-// #[cfg_attr(feature="prusti", requires(end_frame_is_less_than_max(chunk2)))]
-// #[cfg_attr(feature="prusti", requires(end_frame_is_less_than_max_or_none(chunk3)))]
-fn split_chunk_is_contiguous(chunk1: &Option<TrustedChunk>, chunk2: &TrustedChunk, chunk3: &Option<TrustedChunk>) -> bool {
-    let mut contiguous = true;
-    if let Some(c1) = chunk1 {
-        contiguous &= c1.end() + 1 == chunk2.start()
-    } 
-    if let Some(c3) = chunk3 {
-        contiguous &= chunk2.end() + 1 == c3.start()
-    }
-    contiguous
-}
-
-/// Returns true if the end frame of the chunk is less than `MAX_PAGE_NUMBER`, or if the chunk is None.
-// #[cfg_attr(feature="prusti", pure)]
-#[pure]
-fn end_frame_is_less_than_max_or_none(chunk: &Option<TrustedChunk>) -> bool {
-    if let Some(c) = chunk {
-        if c.end() <= MAX_PAGE_NUMBER {
-            return true;
-        } else {
-            return false;
-        }
-    } else {
-        return true;
-    }
-
-}
-
-/// Returns true if the end frame of the chunk is less than `MAX_PAGE_NUMBER`.
-// #[cfg_attr(feature="prusti", pure)]
-#[pure]
-fn end_frame_is_less_than_max(chunk: &TrustedChunk) -> bool {
-    if chunk.end() <= MAX_PAGE_NUMBER {
-        return true;
-    } else {
-        return false;
     }
 }

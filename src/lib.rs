@@ -28,25 +28,14 @@ if #[cfg(prusti)] {
 }
 }
 
-use prusti_contracts::*;
-use core::ops::Deref;
-use crate::{
-    linked_list::*,
-    // memory_structs::*,
-    // trusted_chunk::*
-};
 
-
-
-
-
-/*** Constants taken from kernel_config crate. Only required if CHECK_OVERFLOWS flag is enabled. ***/ 
-/// The lower 12 bits of a virtual address correspond to the P1 page frame offset. 
-pub const PAGE_SHIFT: usize = 12;
-/// Page size is 4096 bytes, 4KiB pages.
-pub const PAGE_SIZE: usize = 1 << PAGE_SHIFT;
-pub const MAX_VIRTUAL_ADDRESS: usize = usize::MAX;
-pub const MAX_PAGE_NUMBER: usize = MAX_VIRTUAL_ADDRESS / PAGE_SIZE;
+// /*** Constants taken from kernel_config crate. Only required if CHECK_OVERFLOWS flag is enabled. ***/ 
+// /// The lower 12 bits of a virtual address correspond to the P1 page frame offset. 
+// pub const PAGE_SHIFT: usize = 12;
+// /// Page size is 4096 bytes, 4KiB pages.
+// pub const PAGE_SIZE: usize = 1 << PAGE_SHIFT;
+// pub const MAX_VIRTUAL_ADDRESS: usize = usize::MAX;
+// pub const MAX_PAGE_NUMBER: usize = MAX_VIRTUAL_ADDRESS / PAGE_SIZE;
 
 // cfg_if::cfg_if! {
 // if #[cfg(not(prusti))] {
