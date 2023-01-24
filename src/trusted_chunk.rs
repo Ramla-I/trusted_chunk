@@ -215,6 +215,33 @@ impl TrustedChunk {
         Ok((first_chunk, second_chunk, third_chunk))
     }
 
+    
+    pub fn split_at(mut self, at_frame: usize) -> Result<(TrustedChunk, TrustedChunk), TrustedChunk> {
+       let end_of_first = at_frame - 1;
+
+        let (first, second) = if at_frame == self.start() && at_frame <= self.end() {
+            let first  = TrustedChunk::empty();
+            let second = TrustedChunk::trusted_new(RangeInclusive::new(at_frame, self.end()));
+            (first, second)
+        } 
+        else if at_frame == (self.end() + 1) && end_of_first >= self.start() {
+            let first  = TrustedChunk::trusted_new(RangeInclusive::new(self.start(), self.end())); 
+            let second = TrustedChunk::empty();
+            (first, second)
+        }
+        else if at_frame > self.start() && end_of_first <= self.end() {
+            let first  = TrustedChunk::trusted_new(RangeInclusive::new(self.start(), end_of_first));
+            let second = TrustedChunk::trusted_new(RangeInclusive::new(at_frame, self.end()));
+            (first, second)
+        }
+        else {
+            return Err(self);
+        };
+
+        core::mem::forget(self);   
+        Ok(( first, second ))
+    }
+
 
     /// Merges `other` into `self`.
     /// Succeeds if `other` lies right before `self` or right after.
