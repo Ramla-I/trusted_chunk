@@ -1,5 +1,5 @@
 use prusti_contracts::*;
-use prusti_contracts::*;
+
 cfg_if::cfg_if! {
 if #[cfg(prusti)] {
     use crate::external_spec::{
