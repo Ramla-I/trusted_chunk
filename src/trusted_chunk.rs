@@ -22,8 +22,6 @@ use crate::{
     static_array::*,
 };
 
-
-
 #[ensures(result.is_some() ==> peek_option(&result) < list.len())]
 #[ensures(result.is_some() ==> list[peek_option(&result)].is_some())]
 #[ensures(result.is_some() ==> {
@@ -66,6 +64,7 @@ pub enum ChunkCreationError {
 /// # Warning
 /// A `RangeInclusive` is created with the precondition that start <= end.
 /// Outside of verified code, it is the caller's responsibility to make sure that precondition is upheld.
+#[cfg_attr(not(prusti), derive(Debug, PartialEq, Eq))]
 pub struct TrustedChunk {
     frames: RangeInclusive<usize>
 }
@@ -89,6 +88,10 @@ impl TrustedChunk {
 
     pub fn frames(&self) -> RangeInclusive<usize> {
         self.frames
+    }
+
+    pub const fn empty() -> TrustedChunk {
+        TrustedChunk { frames: RangeInclusive::new(1, 0) }
     }
 
     /// If no other range in `chunk_list` overlaps with `frames`:
@@ -117,7 +120,7 @@ impl TrustedChunk {
     #[ensures(result.is_ok() ==> {
         forall(|i: usize| (1 <= i && i < chunk_list.len()) ==> old(chunk_list.lookup(i-1)) == chunk_list.lookup(i))
     })]
-    fn new(frames: RangeInclusive<usize>, chunk_list: &mut List) -> Result<TrustedChunk, usize> {
+    pub fn new(frames: RangeInclusive<usize>, chunk_list: &mut List) -> Result<TrustedChunk, usize> {
         let overlap_idx = chunk_list.elem_overlaps_in_list(frames, 0);
         if overlap_idx.is_some(){
             Err(overlap_idx.unwrap())
@@ -154,7 +157,7 @@ impl TrustedChunk {
         forall(|i: usize| ((0 <= i && i < chunk_list.len()) && (i != peek_result_ref(&result).1)) && old(chunk_list.lookup(i)).is_some()
             ==> !range_overlaps(&peek_option(&old(chunk_list.lookup(i))), &frames))
     )] 
-    fn new_pre_heap(frames: RangeInclusive<usize>, chunk_list: &mut StaticArray) -> Result<(TrustedChunk, usize), ChunkCreationError> {
+    pub fn new_pre_heap(frames: RangeInclusive<usize>, chunk_list: &mut StaticArray) -> Result<(TrustedChunk, usize), ChunkCreationError> {
         let overlap_idx = chunk_list.elem_overlaps_in_array(frames, 0);
         if overlap_idx.is_some(){
             Err(ChunkCreationError::Overlap(overlap_idx.unwrap()))
@@ -171,7 +174,7 @@ impl TrustedChunk {
     #[requires(*frames.start() <= *frames.end())]
     #[ensures(result.start() == *frames.start())]
     #[ensures(result.end() == *frames.end())]
-    fn trusted_new(frames: RangeInclusive<usize>) -> TrustedChunk {
+    pub(crate) fn trusted_new(frames: RangeInclusive<usize>) -> TrustedChunk {
         TrustedChunk{frames}
     }
 
@@ -191,22 +194,22 @@ impl TrustedChunk {
         let orig_chunk = peek_err_ref(&result);
         (orig_chunk.start() == self.start()) && (orig_chunk.end() == self.end())
     })]
-    pub fn split(self, start_page: usize, num_frames: usize) -> Result<(Option<TrustedChunk>, TrustedChunk, Option<TrustedChunk>), TrustedChunk> {
-        if (start_page < self.start()) || (start_page + num_frames -1 > self.end()) || (num_frames <= 0) {
+    pub fn split(self, start_frame: usize, num_frames: usize) -> Result<(Option<TrustedChunk>, TrustedChunk, Option<TrustedChunk>), TrustedChunk> {
+        if (start_frame < self.start()) || (start_frame + num_frames -1 > self.end()) || (num_frames <= 0) {
             return Err(self);
         }
 
-        let first_chunk = if start_page == self.start()  {
+        let first_chunk = if start_frame == self.start()  {
             None
         } else {
-            Some(TrustedChunk::trusted_new(RangeInclusive::new(self.start(), start_page - 1)))
+            Some(TrustedChunk::trusted_new(RangeInclusive::new(self.start(), start_frame - 1)))
         };
-        let second_chunk = TrustedChunk::trusted_new(RangeInclusive::new(start_page, start_page + num_frames - 1));
+        let second_chunk = TrustedChunk::trusted_new(RangeInclusive::new(start_frame, start_frame + num_frames - 1));
 
-        let third_chunk = if start_page + num_frames - 1 == self.end() {
+        let third_chunk = if start_frame + num_frames - 1 == self.end() {
             None
         } else {
-            Some(TrustedChunk::trusted_new(RangeInclusive::new(start_page + num_frames, self.end())))
+            Some(TrustedChunk::trusted_new(RangeInclusive::new(start_frame + num_frames, self.end())))
         };
 
         Ok((first_chunk, second_chunk, third_chunk))

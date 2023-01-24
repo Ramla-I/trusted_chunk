@@ -12,6 +12,7 @@ if #[cfg(prusti)] {
     };
 } else {
     use range_inclusive::*;
+    use alloc::boxed::Box;
 }
 }
 
@@ -67,7 +68,7 @@ impl List {
     /// Creates an empty list.
     /// Ensures that the length is zero.
     #[ensures(result.len() == 0)]
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         List { head: Link::Empty }
     }
 
