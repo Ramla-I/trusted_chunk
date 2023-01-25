@@ -5,8 +5,7 @@
 3. Run this command 
 ```
 ./prusti-rustc <path to trusted_chunk/src/lib.rs> -Pcheck_overflows=false --crate-type=lib --cfg "prusti"
-
+```
 
 ## Notes for Prusti improvements
 1. Eq, PartialEq, Ord, etc. traits should be pure by default
-```
