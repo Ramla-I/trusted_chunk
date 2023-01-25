@@ -90,8 +90,16 @@ impl TrustedChunk {
         self.frames
     }
 
+    #[ensures(result.is_empty())]
     pub const fn empty() -> TrustedChunk {
         TrustedChunk { frames: RangeInclusive::new(1, 0) }
+    }
+
+    #[pure]
+    #[ensures(result ==> self.end() < self.start())]
+    pub fn is_empty(&self) -> bool {
+        !(self.start() <= self.end())
+
     }
 
     /// If no other range in `chunk_list` overlaps with `frames`:
@@ -215,12 +223,38 @@ impl TrustedChunk {
         Ok((first_chunk, second_chunk, third_chunk))
     }
 
-    
+
+    #[ensures(result.is_ok() ==> {
+        let split_chunk = peek_result_ref(&result);
+        split_chunk.0.is_empty() && !split_chunk.1.is_empty() ||
+        !split_chunk.0.is_empty() && split_chunk.1.is_empty() ||
+        !split_chunk.0.is_empty() && !split_chunk.1.is_empty()
+    })]
+    #[ensures(result.is_ok() ==> {
+        let split_chunk = peek_result_ref(&result);
+        split_chunk.0.is_empty() ==> split_chunk.1.start() == old(self.start()) && split_chunk.1.end() == old(self.end())
+    })]
+    #[ensures(result.is_ok() ==> {
+        let split_chunk = peek_result_ref(&result);
+        split_chunk.1.is_empty() ==> split_chunk.0.start() == old(self.start()) && split_chunk.0.end() == old(self.end())
+    })]
+    #[ensures(result.is_ok() ==> {
+        let split_chunk = peek_result_ref(&result);
+        !split_chunk.0.is_empty() && !split_chunk.1.is_empty() ==> {
+            split_chunk.0.start() == old(self.start()) && split_chunk.0.end() == at_frame - 1 &&
+            split_chunk.1.start() == at_frame && split_chunk.1.end() == old(self.end())
+        }
+    })]
+    #[ensures(result.is_err() ==> {
+        let orig_chunk = peek_err_ref(&result);
+        (orig_chunk.start() == self.start()) && (orig_chunk.end() == self.end())
+    })]
     pub fn split_at(mut self, at_frame: usize) -> Result<(TrustedChunk, TrustedChunk), TrustedChunk> {
        let end_of_first = at_frame - 1;
 
         let (first, second) = if at_frame == self.start() && at_frame <= self.end() {
             let first  = TrustedChunk::empty();
+            prusti_assert!(first.is_empty());
             let second = TrustedChunk::trusted_new(RangeInclusive::new(at_frame, self.end()));
             (first, second)
         } 
