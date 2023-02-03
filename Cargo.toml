@@ -11,3 +11,7 @@ prusti-contracts = "^0.1"
 cfg-if = "1.0.0"
 range_inclusive = {git = "https://github.com/Ramla-I/range_inclusive"}
 # static_assertions = "1.1.0"
+
+[features]
+default = []
+without_std = []
