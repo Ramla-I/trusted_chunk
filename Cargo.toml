@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 # prusti-contracts = { git = "https://github.com/viperproject/prusti-dev.git" }
-prusti-contracts = "^0.1"
+prusti-contracts = "=0.1.4"
 cfg-if = "1.0.0"
 range_inclusive = {git = "https://github.com/Ramla-I/range_inclusive"}
 # static_assertions = "1.1.0"

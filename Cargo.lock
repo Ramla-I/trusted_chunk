@@ -10,18 +10,18 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
 name = "prusti-contracts"
-version = "0.1.2"
+version = "0.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2176455bb39f9d5624a6cab7fcdd2fc01cae31bb375e32c771e12147500ad475"
+checksum = "0a55ba828aceca3c0786a6dd252e1d219720d15f4c454b70fee282111469c940"
 dependencies = [
  "prusti-contracts-proc-macros",
 ]
 
 [[package]]
 name = "prusti-contracts-proc-macros"
-version = "0.1.2"
+version = "0.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "76696edede87b1c7de1b6e56c3d3e68cd9c3924b7375c6c79d15aa08685cf2fc"
+checksum = "dc5a49e19cc2309c2f7babcceeed80dacf3e69c8ebfb03355c76d89a0f1d1ddd"
 
 [[package]]
 name = "range_inclusive"
