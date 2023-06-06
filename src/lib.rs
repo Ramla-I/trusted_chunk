@@ -35,9 +35,15 @@ if #[cfg(prusti)] {
 }
 }
 
+
 #[cfg(not(prusti))] 
 pub fn init() -> fn(RangeInclusive<usize>) -> trusted_chunk::TrustedChunk {
-    |frames: RangeInclusive<usize>| -> trusted_chunk::TrustedChunk {
-        trusted_chunk::TrustedChunk::trusted_new(frames)
-    }
+    create_from_unmapped
+}
+
+#[requires(*frames.start() <= *frames.end())]
+#[ensures(result.start() == *frames.start())]
+#[ensures(result.end() == *frames.end())]
+fn create_from_unmapped(frames: RangeInclusive<usize>) -> trusted_chunk::TrustedChunk {
+    trusted_chunk::TrustedChunk::trusted_new(frames)
 }
