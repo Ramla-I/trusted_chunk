@@ -55,7 +55,8 @@ pub fn range_overlaps_in_array(range: RangeInclusive<usize>, list: [Option<Range
 #[derive(Copy, Clone)]
 pub enum ChunkCreationError {
     Overlap(usize),
-    NoSpace
+    NoSpace,
+    InvalidRange
 }
 
 /// A struct representing a unique unallocated region in memory.
@@ -110,12 +111,10 @@ impl TrustedChunk {
     #[ensures(result.is_ok() ==> peek_result_ref(&result).start() == *frames.start())]
     #[ensures(result.is_ok() ==> peek_result_ref(&result).end() == *frames.end())]
     #[ensures(result.is_err() ==> {
-        let overlap_idx = peek_err(&result);
-        overlap_idx < chunk_list.len()
-    })]
-    #[ensures(result.is_err() ==> {
-        let overlap_idx = peek_err(&result);
-        range_overlaps(&chunk_list.lookup(overlap_idx), &frames)
+        match peek_err(&result) {
+            ChunkCreationError::Overlap(idx) => (idx < chunk_list.len()) & range_overlaps(&chunk_list.lookup(idx), &frames),
+            _ => true
+        }
     })]
     #[ensures(result.is_ok() ==> chunk_list.len() >= 1)]
     #[ensures(result.is_ok() ==> {
@@ -128,10 +127,10 @@ impl TrustedChunk {
     #[ensures(result.is_ok() ==> {
         forall(|i: usize| (1 <= i && i < chunk_list.len()) ==> old(chunk_list.lookup(i-1)) == chunk_list.lookup(i))
     })]
-    pub fn new(frames: RangeInclusive<usize>, chunk_list: &mut List) -> Result<TrustedChunk, usize> {
+    pub fn new(frames: RangeInclusive<usize>, chunk_list: &mut List) -> Result<TrustedChunk, ChunkCreationError> {
         let overlap_idx = chunk_list.elem_overlaps_in_list(frames, 0);
         if overlap_idx.is_some(){
-            Err(overlap_idx.unwrap())
+            Err(ChunkCreationError::Overlap(overlap_idx.unwrap()))
         } else {
             chunk_list.push(frames);
             Ok(TrustedChunk { frames })
@@ -142,7 +141,7 @@ impl TrustedChunk {
     #[ensures(result.is_err() ==> {
         match peek_err(&result) {
             ChunkCreationError::Overlap(idx) => (idx < chunk_list.len()) && (chunk_list.lookup(idx).is_some()) && range_overlaps(&peek_option(&chunk_list.lookup(idx)), &frames),
-            ChunkCreationError::NoSpace => true
+            _ => true
         }
     })]
     #[ensures(result.is_ok() ==> peek_result_ref(&result).0.start() == *frames.start())]
@@ -295,7 +294,7 @@ impl TrustedChunk {
         if self.is_empty() | other.is_empty() {
             return Err(other);
         }
-        
+
         if self.start() == other.end() + 1 {
             // `other` comes contiguously before `self`
             self.frames = RangeInclusive::new(other.start(), self.end());
