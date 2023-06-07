@@ -1,15 +1,21 @@
-//! Following are a set of pure functions that are only used in the specification of a TrustedChunk.
+//! The following are a set of pure functions that are only used in the specification of a `TrustedChunk`.
 
 use crate::trusted_chunk::*;
+use crate::external_spec::trusted_option::*;
 
 /// Checks that either chunk1 ends before chunk2 starts, or that chunk2 ends before chunk1 starts.
 #[pure]
+#[requires(chunk1.start() <= chunk1.end())]
+#[requires(chunk2.start() <= chunk2.end())]
 pub(crate) fn chunks_do_not_overlap(chunk1: &TrustedChunk, chunk2: &TrustedChunk) -> bool {
     (chunk1.end() < chunk2.start()) | (chunk2.end() < chunk1.start())
 }
 
 /// Returns true if there is no overlap in the ranges of `chunk1`, `chunk2` and `chunk3`.
 #[pure]
+#[requires(chunk1.is_some() ==> peek_option_ref(&chunk1).start() <= peek_option_ref(&chunk1).end())]
+#[requires(chunk2.start() <= chunk2.end())]
+#[requires(chunk3.is_some() ==> peek_option_ref(&chunk3).start() <= peek_option_ref(&chunk3).end())]
 pub(crate) fn split_chunk_has_no_overlapping_ranges(chunk1: &Option<TrustedChunk>, chunk2: &TrustedChunk, chunk3: &Option<TrustedChunk>) -> bool {
     let mut no_overlap = true;
 
@@ -30,6 +36,10 @@ pub(crate) fn split_chunk_has_no_overlapping_ranges(chunk1: &Option<TrustedChunk
 
 /// Returns true if the start and end of the original chunk is equal to the extreme bounds of the split chunk.
 #[pure]
+#[requires(orig_chunk.start() <= orig_chunk.end())]
+#[requires(split_chunk.0.is_some() ==> peek_option_ref(&split_chunk.0).start() <= peek_option_ref(&split_chunk.0).end())]
+#[requires(split_chunk.1.start() <= split_chunk.1.end())]
+#[requires(split_chunk.2.is_some() ==> peek_option_ref(&split_chunk.2).start() <= peek_option_ref(&split_chunk.2).end())]
 pub(crate) fn split_chunk_has_same_range(orig_chunk: &TrustedChunk, split_chunk: &(Option<TrustedChunk>, TrustedChunk, Option<TrustedChunk>)) -> bool {
     let (chunk1,chunk2,chunk3) = split_chunk;
     let min_page;
@@ -57,6 +67,9 @@ pub(crate) fn split_chunk_has_same_range(orig_chunk: &TrustedChunk, split_chunk:
 // #[cfg_attr(feature="prusti", requires(end_frame_is_less_than_max_or_none(chunk1)))]
 // #[cfg_attr(feature="prusti", requires(end_frame_is_less_than_max(chunk2)))]
 // #[cfg_attr(feature="prusti", requires(end_frame_is_less_than_max_or_none(chunk3)))]
+#[requires(chunk1.is_some() ==> peek_option_ref(&chunk1).start() <= peek_option_ref(&chunk1).end())]
+#[requires(chunk2.start() <= chunk2.end())]
+#[requires(chunk3.is_some() ==> peek_option_ref(&chunk3).start() <= peek_option_ref(&chunk3).end())]
 pub(crate) fn split_chunk_is_contiguous(chunk1: &Option<TrustedChunk>, chunk2: &TrustedChunk, chunk3: &Option<TrustedChunk>) -> bool {
     let mut contiguous = true;
     if let Some(c1) = chunk1 {

@@ -16,8 +16,18 @@ if #[cfg(prusti)] {
 
 use core::cmp::{max,min};
 
+// #[pure]
+// fn max(a: usize, b: usize) -> usize {
+//     if a >= b { a } else { b }
+// }
+
+// #[pure]
+// fn min(a: usize, b: usize) -> usize {
+//     if a <= b { a } else { b }
+// }
+
 #[pure]
-#[trusted]
+#[trusted] // Only trusted functions can call themselves in their contracts
 #[ensures(result ==> range_overlaps(range2, range1))]
 pub fn range_overlaps(range1: &RangeInclusive<usize>, range2: &RangeInclusive<usize>) -> bool {
     if range1.is_empty() || range2.is_empty() {

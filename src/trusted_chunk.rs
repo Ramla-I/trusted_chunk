@@ -292,6 +292,10 @@ impl TrustedChunk {
         (self.start() == old(self.start())) && (self.end() == old(self.end())) 
     })]
     pub fn merge(&mut self, other: TrustedChunk) -> Result<(), TrustedChunk> {
+        if self.is_empty() | other.is_empty() {
+            return Err(other);
+        }
+        
         if self.start() == other.end() + 1 {
             // `other` comes contiguously before `self`
             self.frames = RangeInclusive::new(other.start(), self.end());

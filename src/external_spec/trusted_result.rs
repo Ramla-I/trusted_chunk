@@ -1,4 +1,4 @@
-//! Don't have to write an extern spec for Result because it's already in prusti_contracts
+//! Don't have to write an extern spec for `Result` because it's already in prusti_contracts
 
 use prusti_contracts::*;
 
