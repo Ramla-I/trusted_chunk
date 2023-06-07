@@ -7,9 +7,6 @@ pub struct RangeInclusive<Idx: Clone + PartialOrd> {
 }
 
 impl<Idx: Clone + PartialOrd> RangeInclusive<Idx> {
-    // #[cfg_attr(feature="prusti", requires(start <= end))]
-    // #[cfg_attr(feature="prusti", ensures(result.start == start))]
-    // #[cfg_attr(feature="prusti", ensures(result.end == end))]
     #[ensures(result.start == start)]
     #[ensures(result.end == end)]
     pub(crate) const fn new(start: Idx, end: Idx) -> Self {
