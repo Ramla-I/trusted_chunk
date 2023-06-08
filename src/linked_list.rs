@@ -25,7 +25,7 @@ use core::{
 
 
 pub struct List {
-    pub(crate) head: Link,
+    head: Link,
 }
 
 pub(crate) enum Link {
@@ -210,7 +210,7 @@ impl List {
     }
 
 
-    /// Returns the index of the first element in the list which overlaps with `elem`.
+    /// Returns the index of the first element in the list, starting from `index`, which overlaps with `elem`.
     /// Returns None if there is no overlap.
     /// 
     /// # Pre-conditions:

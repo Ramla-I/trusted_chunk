@@ -170,8 +170,8 @@ impl TrustedChunk {
             Err(ChunkCreationError::Overlap(overlap_idx.unwrap()))
         } else {
             match chunk_list.push(frames){
-                Some(idx) => Ok((TrustedChunk { frames }, idx)),
-                None => Err(ChunkCreationError::NoSpace)
+                Ok(idx) => Ok((TrustedChunk { frames }, idx)),
+                Err(()) => Err(ChunkCreationError::NoSpace)
             }
         }
     }
