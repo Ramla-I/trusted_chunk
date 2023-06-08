@@ -1,4 +1,5 @@
-//! Don't have to write an extern spec for `Result` because it's already in prusti_contracts
+//! Helper functions for `Result` to peek the inner value.
+//! We don't have to write an extern spec for `Result` because it's already in prusti_contracts.
 
 use prusti_contracts::*;
 

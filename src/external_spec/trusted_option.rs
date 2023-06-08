@@ -1,3 +1,5 @@
+//! The specification for the `Option` type and helper functions to peek the inner value.
+
 use prusti_contracts::*;
 use crate::external_spec::trusted_range_inclusive::*;
 
