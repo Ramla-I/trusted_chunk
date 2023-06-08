@@ -3,7 +3,10 @@
 use crate::trusted_chunk::*;
 use crate::external_spec::trusted_option::*;
 
-/// Checks that either chunk1 ends before chunk2 starts, or that chunk2 ends before chunk1 starts.
+/// Checks that either `chunk1` ends before `chunk2` starts, or that `chunk2` ends before `chunk1` starts.
+/// 
+/// # Pre-conditions:
+/// * `chunk1` and `chunk2` are not empty
 #[pure]
 #[requires(!chunk1.is_empty())]
 #[requires(!chunk2.is_empty())]
@@ -12,6 +15,9 @@ pub(crate) fn chunks_do_not_overlap(chunk1: &TrustedChunk, chunk2: &TrustedChunk
 }
 
 /// Returns true if there is no overlap in the ranges of `chunk1`, `chunk2` and `chunk3`.
+/// 
+/// # Pre-conditions:
+/// * chunks are not empty
 #[pure]
 #[requires(chunk1.is_some() ==> !peek_option_ref(&chunk1).is_empty())]
 #[requires(!chunk2.is_empty())]
@@ -35,6 +41,9 @@ pub(crate) fn split_chunk_has_no_overlapping_ranges(chunk1: &Option<TrustedChunk
 }
 
 /// Returns true if the start and end of the original chunk is equal to the extreme bounds of the split chunk.
+/// 
+/// # Pre-conditions:
+/// * chunks are not empty
 #[pure]
 #[requires(!orig_chunk.is_empty())]
 #[requires(split_chunk.0.is_some() ==> !peek_option_ref(&split_chunk.0).is_empty())]
@@ -62,6 +71,9 @@ pub(crate) fn split_chunk_has_same_range(orig_chunk: &TrustedChunk, split_chunk:
 
 
 /// Returns true if `chunk1`, `chunk2` and `chunk3` are contiguous.
+/// 
+/// # Pre-conditions:
+/// * chunks are not empty
 #[pure]
 // #[requires(end_frame_is_less_than_max_or_none(chunk1))] //only required if CHECK_OVERFLOWS flag is enabled
 // #[requires(end_frame_is_less_than_max(chunk2))] //only required if CHECK_OVERFLOWS flag is enabled
