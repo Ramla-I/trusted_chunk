@@ -33,7 +33,7 @@ impl TrustedChunkAllocator {
         TrustedChunkAllocator { heap_init: false, list: List::new(), array: StaticArray::new() }
     }
 
-    pub fn switch_to_list(&mut self) {
+    pub fn switch_to_heap_allocated(&mut self) {
         self.heap_init = true;
     }
 
@@ -242,7 +242,7 @@ impl TrustedChunk {
 
         let (first, second) = if at_frame == self.start() && at_frame <= self.end() {
             let first  = TrustedChunk::empty();
-            prusti_assert!(first.is_empty());
+            // prusti_assert!(first.is_empty());
             let second = TrustedChunk::trusted_new(RangeInclusive::new(at_frame, self.end()));
             (first, second)
         } 

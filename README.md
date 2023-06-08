@@ -7,7 +7,7 @@
 ./prusti-rustc <path to trusted_chunk/src/lib.rs> -Pcheck_overflows=false --crate-type=lib --cfg "prusti"
 ```
 
-## Uing with Theseus
+## Using with Theseus
 Uncomment the no_std attribute at the top of the crate lib.rs file.
 
 ## Notes for Prusti improvements
