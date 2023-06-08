@@ -1,18 +1,14 @@
 use prusti_contracts::*;
 
-cfg_if::cfg_if! {
-if #[cfg(prusti)] {
-    use crate::external_spec::{
-        trusted_option::*,
-        trusted_result::*,
-        trusted_range_inclusive::*,
-    };
-} else {
-    use range_inclusive::*;
-}
-}
+#[cfg(prusti)]
+use crate::external_spec::trusted_range_inclusive::*;
+#[cfg(not(prusti))]
+use range_inclusive::*;
 
-use crate::spec::range_overlaps::*;
+use crate::{
+    external_spec::{trusted_option::*, trusted_result::*},
+    spec::range_overlaps::*
+};
 use core::mem;
 
 pub struct StaticArray  {

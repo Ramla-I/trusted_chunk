@@ -3,13 +3,11 @@
 //! If this definition of overlapping doesn't match what the rest of the system expects, then the results of verification won't make sense.
 
 use prusti_contracts::*;
-cfg_if::cfg_if! {
-if #[cfg(prusti)] {
-    use crate::external_spec::trusted_range_inclusive::*;
-} else {
-    use range_inclusive::*;
-}
-}
+
+#[cfg(prusti)]
+use crate::external_spec::trusted_range_inclusive::*;
+#[cfg(not(prusti))]
+use range_inclusive::*;
 
 use core::cmp::{max,min};
 

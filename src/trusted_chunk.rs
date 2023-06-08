@@ -1,24 +1,16 @@
 use prusti_contracts::*;
 
-cfg_if::cfg_if! {
-if #[cfg(prusti)] {
-    use crate::external_spec::{
-        trusted_option::*,
-        trusted_result::*,
-        trusted_range_inclusive::*,
-    };
-} else {
-    use range_inclusive::*;
-}
-}
+#[cfg(prusti)]
+use crate::external_spec::trusted_range_inclusive::*;
+#[cfg(not(prusti))]
+use range_inclusive::*;
+
 use core::ops::{Deref, DerefMut};
 use crate::{
     *,
+    external_spec::{trusted_option::*, trusted_result::*},
+    spec::{range_overlaps::range_overlaps, chunk_spec::*},
     linked_list::*, 
-    spec::{
-        range_overlaps::range_overlaps,
-        chunk_spec::*
-    },
     static_array::*,
 };
 
