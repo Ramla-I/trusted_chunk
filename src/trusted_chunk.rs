@@ -14,41 +14,38 @@ use crate::{
     static_array::*,
 };
 
-#[ensures(result.is_some() ==> peek_option(&result) < list.len())]
-#[ensures(result.is_some() ==> list[peek_option(&result)].is_some())]
-#[ensures(result.is_some() ==> {
-    let idx = peek_option(&result);
-    let elem = peek_option(&list[idx]);
-    range_overlaps(&range, &elem)
-}
-)]
-#[ensures(result.is_none() ==> 
-    forall(|i: usize| ((0 <= i && i < list.len()) && list[i].is_some()) ==> {
-        let elem = peek_option(&list[i]);
-        !range_overlaps(&range, &elem)
-    })
-)]
-pub fn range_overlaps_in_array(range: RangeInclusive<usize>, list: [Option<RangeInclusive<usize>>; 64]) -> Option<usize> {
-    let mut i = 0;
-    while i < list.len() {
-        body_invariant!(i < list.len());
-        body_invariant!(i >= 0);
-
-        if list[i].is_some(){
-            if range_overlaps(&range, &list[i].unwrap()) {
-                return Some(i);
-            }
-        }
-    }
-    None
-}
-
 
 #[derive(Copy, Clone)]
 pub enum ChunkCreationError {
     Overlap(usize),
     NoSpace,
     InvalidRange
+}
+
+pub struct TrustedChunkAllocator {
+    heap_init: bool,
+    list: List,
+    array: StaticArray
+}
+
+impl TrustedChunkAllocator {
+    pub fn new() -> TrustedChunkAllocator {
+        TrustedChunkAllocator { heap_init: false, list: List::new(), array: StaticArray::new() }
+    }
+
+    pub fn switch_to_list(&mut self) {
+        self.heap_init = true;
+    }
+
+    #[requires(*chunk_range.start() <= *chunk_range.end())]
+    pub fn create_chunk(&mut self, chunk_range: RangeInclusive<usize>) -> Result<TrustedChunk, ChunkCreationError> {
+        if self.heap_init {
+            TrustedChunk::new(chunk_range, &mut self.list)
+        } else {
+            TrustedChunk::new_pre_heap(chunk_range, &mut self.array)
+                .map(|(c,idx)| c)
+        }
+    }
 }
 
 /// A struct representing a unique unallocated region in memory.
@@ -119,7 +116,7 @@ impl TrustedChunk {
     #[ensures(result.is_ok() ==> {
         forall(|i: usize| (1 <= i && i < chunk_list.len()) ==> old(chunk_list.lookup(i-1)) == chunk_list.lookup(i))
     })]
-    pub fn new(frames: RangeInclusive<usize>, chunk_list: &mut List) -> Result<TrustedChunk, ChunkCreationError> {
+    fn new(frames: RangeInclusive<usize>, chunk_list: &mut List) -> Result<TrustedChunk, ChunkCreationError> {
         let overlap_idx = chunk_list.elem_overlaps_in_list(frames, 0);
         if overlap_idx.is_some(){
             Err(ChunkCreationError::Overlap(overlap_idx.unwrap()))
@@ -156,7 +153,7 @@ impl TrustedChunk {
         forall(|i: usize| ((0 <= i && i < chunk_list.len()) && (i != peek_result_ref(&result).1)) && old(chunk_list.lookup(i)).is_some()
             ==> !range_overlaps(&peek_option(&old(chunk_list.lookup(i))), &frames))
     )] 
-    pub fn new_pre_heap(frames: RangeInclusive<usize>, chunk_list: &mut StaticArray) -> Result<(TrustedChunk, usize), ChunkCreationError> {
+    fn new_pre_heap(frames: RangeInclusive<usize>, chunk_list: &mut StaticArray) -> Result<(TrustedChunk, usize), ChunkCreationError> {
         let overlap_idx = chunk_list.elem_overlaps_in_array(frames, 0);
         if overlap_idx.is_some(){
             Err(ChunkCreationError::Overlap(overlap_idx.unwrap()))
