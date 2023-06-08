@@ -19,7 +19,7 @@ use core::cmp::{max,min};
 /// 
 /// # Verification Notes:
 /// * Removing the trusted marking leads to "unexpected internal errors", I think because of issues with generics in RangeInclusive.
-/// * To make sure the post-conditions are valid, I implemented a range_overlaps_check function (below) which is identical except
+/// * To make sure the post-conditions are valid, I implemented a range_overlaps_check function (EOF) which is identical except
 /// it works with a Range type without generics, and it verifies.
 #[pure]
 #[trusted] // Only trusted functions can call themselves in their contracts

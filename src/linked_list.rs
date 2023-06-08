@@ -1,4 +1,4 @@
-//! Most of the List code is taken from the Prusti user guide 
+//! Most of the List code is adapted from the Prusti user guide 
 //! https://viperproject.github.io/prusti-dev/user-guide/tour/summary.html
 
 
@@ -58,7 +58,9 @@ impl List {
     }
 
     /// Looks up an element in the list.
-    /// Requires that the index is within range. 
+    /// 
+    /// # Pre-conditions:
+    /// * index is less than the length
     #[pure]
     #[requires(0 <= index && index < self.len())]
     pub fn lookup(&self, index: usize) -> RangeInclusive<usize> {
@@ -66,14 +68,18 @@ impl List {
     }
 
     /// Creates an empty list.
-    /// Ensures that the length is zero.
+    /// 
+    /// # Post-conditions: 
+    /// * length is zero.
     #[ensures(result.len() == 0)]
     pub const fn new() -> Self {
         List { head: Link::Empty }
     }
 
+
     /// Adds an element to the list.
-    /// Ensures that:
+    /// 
+    /// # Post-conditions:
     /// * new_length = old_length + 1
     /// * `elem` is added at index 0
     /// * all previous elements remain in the list, just moved one index forward
@@ -89,6 +95,17 @@ impl List {
         self.head = Link::More(new_node);
     }
 
+
+    /// Adds `elem` to the list only if it doesn't overlap with any existing member of the list.
+    /// If it fails, then it returns the index of the element that overlaps with `elem`.
+    /// 
+    /// # Post-conditions:
+    /// * If the push fails, than the returned index is less than the list length
+    /// * If the push fails, then `elem` overlaps with the element at the returned index
+    /// * If the push succeeds, then new_length = old_length + 1
+    /// * If the push succeeds, then `elem` is added at index 0
+    /// * If the push succeeds, then all previous elements remain in the list, just moved one index forward
+    /// * If the push succeeds, then `elem` doesn't overlap with any other element in the list
     #[ensures(result.is_err() ==> peek_err(&result) < self.len())]
     #[ensures(result.is_err() ==> {
             let idx = peek_err(&result);
@@ -120,22 +137,35 @@ impl List {
     }
 
 
+    /// A push function that ensures there is no overlap of list elements, given that the list originally has no overlaps.
+    /// 
+    /// # Pre-conditions:
+    /// * list elements do not overlap
+    /// 
+    /// # Post-conditions:
+    /// * If the push fails, than the returned index is less than the list length
+    /// * If the push fails, then `elem` overlaps with the element at the returned index
+    /// * If the push succeeds, then new_length = old_length + 1
+    /// * If the push succeeds, then `elem` is added at index 0
+    /// * If the push succeeds, then all previous elements remain in the list, just moved one index forward
+    /// * If the push succeeds, then list elements do not overlap
     #[requires(forall(|i: usize, j: usize| (0 <= i && i < self.len() && 0 <= j && j < self.len()) ==> 
         (i != j ==> !range_overlaps(&self.lookup(i), &self.lookup(j))))
+    )]
+    #[ensures(result.is_err() ==> peek_err(&result) < self.len())]
+    #[ensures(result.is_err() ==> {
+            let idx = peek_err(&result);
+            let range = self.lookup(idx);
+            range_overlaps(&range, &elem)
+        }
     )]
     #[ensures(result.is_ok() ==> self.len() == old(self.len()) + 1)] 
     #[ensures(result.is_ok() ==> self.lookup(0) == elem)]
     #[ensures(result.is_ok() ==> forall(|i: usize| (1 <= i && i < self.len()) ==> old(self.lookup(i-1)) == self.lookup(i)))]
-    // #[ensures(result.is_ok() ==> 
-    //     forall(|i: usize| (1 <= i && i < self.len()) ==> {
-    //         let range = self.lookup(i);
-    //         !range.overlaps_with(&elem)
-    //     })
-    // )]
     #[ensures(forall(|i: usize, j: usize| (0 <= i && i < self.len() && 0 <= j && j < self.len()) ==> 
         (i != j ==> !range_overlaps(&self.lookup(i),&self.lookup(j))))
     )]
-    pub fn push_unique2(&mut self, elem: RangeInclusive<usize>) -> Result<(),usize> {
+    pub fn push_unique_with_precond(&mut self, elem: RangeInclusive<usize>) -> Result<(),usize> {
         match self.elem_overlaps_in_list(elem, 0) {
             Some(idx) => Err(idx),
             None => {
@@ -150,8 +180,9 @@ impl List {
     }
 
     
-    /// Removes element at index 0 from the list
-    /// Ensures that:
+    /// Removes element at index 0 from the list.
+    /// 
+    /// Post-conditions:
     /// * if the list is empty, returns None.
     /// * if the list is not empty, returns Some().
     /// * if the list is empty, the length remains 0.
@@ -179,32 +210,14 @@ impl List {
     }
 
 
-    // /// Returns true if `elem` overlaps with any range in the list that starts at `link`
-    // // #[cfg_attr(feature="prusti", pure)]
-    // #[pure]
-    // pub(crate) fn overlaps(link: &Link<T>, elem: T) -> bool {
-    //     let ret = match link {
-    //         Link::Empty => false,
-    //         Link::More(box node) => {
-    //             if node.elem.overlaps_with(&elem) {
-    //                 true
-    //             } else {
-    //                 false || Self::overlaps(&node.next, elem)
-    //             }
-    //         }
-    //     };
-    //     ret
-    // }
-
-
-
     /// Returns the index of the first element in the list which overlaps with `elem`.
     /// Returns None if there is no overlap.
     /// 
-    /// Requires that the index lies with in range.
+    /// # Pre-conditions:
+    /// * index is less than or equal to the list length
     /// 
-    /// Ensures that:
-    /// * if the result is Some(idx), then idx lies within the list's length.
+    /// # Post-conditions:
+    /// * if the result is Some(idx), then idx is less than the list's length.
     /// * if the result is Some(idx), then the element at idx overlaps with `elem`
     /// * if the result is None, then no element in the lists overlaps with `elem`
     #[requires(0 <= index && index <= self.len())]
@@ -222,7 +235,7 @@ impl List {
         })
     )]
     pub(crate) fn elem_overlaps_in_list(&self, elem: RangeInclusive<usize>, index: usize) -> Option<usize> {
-        if index >= self.len() {
+        if index == self.len() {
             return None;
         }
         let ret = if range_overlaps(&self.lookup(index),&elem) {
@@ -237,6 +250,11 @@ impl List {
 
 impl Link {
 
+    /// Recursive function that returns length of the list starting from this Link/ Node
+    /// 
+    /// # Post-conditions:
+    /// * returns 0 if the link is empty
+    /// * returns >0 if the link is not empty
     #[pure]
     #[ensures(self.is_empty() ==> result == 0)]
     #[ensures(!self.is_empty() ==> result > 0)]
@@ -255,6 +273,10 @@ impl Link {
         }
     }
 
+    /// Recursive function that returns the element at the given `index`.
+    /// 
+    /// # Pre-conditions:
+    /// * `index` is less than the list length
     #[pure]
     #[requires(0 <= index && index < self.len())]
     pub fn lookup(&self, index: usize) -> RangeInclusive<usize> {
