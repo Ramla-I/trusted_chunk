@@ -17,11 +17,20 @@ use crate::{
 
 #[derive(Copy, Clone)]
 pub enum ChunkCreationError {
+    /// There was already a `TrustedChunk` created with an overlapping range
     Overlap(usize),
+    /// In the pre-heap-intialization phase, if there is no more space in the array
     NoSpace,
+    /// The requested range is empty (end > start)
     InvalidRange
 }
 
+/// An allocator that allocates `TrustedChunk` objects with the invariant that all 
+/// chunks from this allocator are unique (there is no overlap in the ranges of the chunks).
+/// 
+/// Pre-heap initialization, the allocator keeps an array to store information about all the chunks created so far.
+/// After the heap is initialized, the ranges stored in `array` are shifted to a linked list and the 
+/// linked list is used to bookkeep all further allocations.
 pub struct TrustedChunkAllocator {
     heap_init: bool,
     list: List,
@@ -29,18 +38,32 @@ pub struct TrustedChunkAllocator {
 }
 
 impl TrustedChunkAllocator {
+    /// Creates an allocator with empty bookkeeping structures
     pub fn new() -> TrustedChunkAllocator {
         TrustedChunkAllocator { heap_init: false, list: List::new(), array: StaticArray::new() }
     }
 
-    #[requires(self.list.len() == 0)]
+
+    /// Shifts all elements in `array` to the heap-allocated `list`.
+    /// Returns an error if the heap was already initialized and the transfer has already occured.
+    /// 
+    /// # Post-conditions:
+    /// * If `heap_init` was set or the `list` was not empty, then an error is returned
+    /// * If successful, `heap_init` is set
+    /// * If successful, then all elements of `array` are set to None
+    /// * If successful, then no element in `list` overlaps
+    /// 
+    /// # Verification Notes:
+    /// Ideally, should relate each element in the old `array` with elements in the updated `list`
+    /// but haven't figured out a loop invariant that does that.
+    #[ensures((old(self.heap_init) || old(self.list.len() != 0)) ==> result.is_err())]
     #[ensures(result.is_ok() ==> self.heap_init)]
     #[ensures(result.is_ok() ==> forall(|i: usize| (0 <= i && i < self.array.arr.len()) ==> self.array.arr[i].is_none()))]
     #[ensures(result.is_ok() ==> forall(|i: usize, j: usize| (0 <= i && i < self.list.len() && 0 <= j && j < self.list.len()) ==> 
         (i != j ==> !range_overlaps(&self.list.lookup(i), &self.list.lookup(j))))
     )]
     pub fn switch_to_heap_allocated(&mut self) -> Result<(),()> {
-        if self.heap_init {
+        if self.heap_init || self.list.len() != 0 {
             return Err(());
         }
 
@@ -53,9 +76,7 @@ impl TrustedChunkAllocator {
             body_invariant!(i < self.array.arr.len());
             body_invariant!(i >= 0);
 
-            let range = self.array.lookup_range_bounds(i);
-            if range.is_some() {
-                let (start, end) = range.unwrap();
+            if let Some((start, end)) = self.array.lookup_range_bounds(i) {
                 match self.list.push_unique_with_precond(RangeInclusive::new(start, end)) {
                     Ok(()) => self.array.set_element(i, None),
                     Err(_) => return Err(())
@@ -67,6 +88,21 @@ impl TrustedChunkAllocator {
         Ok(())
     }
 
+
+    /// The only public interface to create a `TrustedChunk`.
+    /// 
+    /// # Pre-conditions:
+    /// * `chunk_range` is not empty
+    /// 
+    /// # Post-conditions:
+    /// * If ChunkCreationError::Overlap(idx) is returned, then `chunk_range` overlaps with the element at index idx
+    /// * If successful, then result is equal to `chunk_range`
+    /// * If successful, then `chunk_range` did not overlap with any element in the old array/ list
+    /// * If successful, then `chunk_range` has been added to the array/ list
+    /// 
+    /// # Verification Notes:
+    /// We could bring all post-conditions from the TrustedChunk::new functions as post-conditions here
+    /// but it gets extremenly verbose
     #[requires(*chunk_range.start() <= *chunk_range.end())]
     #[ensures(result.is_err() ==> {
         match peek_err(&result) {
@@ -84,7 +120,7 @@ impl TrustedChunkAllocator {
     #[ensures(result.is_ok() ==> {
         (self.heap_init && forall(|i: usize| (0 <= i && i < old(self.list.len())) ==> !range_overlaps(&old(self.list.lookup(i)), &chunk_range)))
         ||
-        (!self.heap_init && forall(|i: usize| ((0 <= i && i < self.array.len()) && (i != peek_result_ref(&result).1)) && old(self.array.lookup(i)).is_some()
+        (!self.heap_init && forall(|i: usize| (0 <= i && i < old(self.array.len())) && old(self.array.lookup(i)).is_some()
             ==> !range_overlaps(&peek_option(&old(self.array.lookup(i))), &chunk_range)))
     })]
     #[ensures(result.is_ok() ==> {
@@ -206,7 +242,7 @@ impl TrustedChunk {
         forall(|i: usize| ((0 <= i && i < chunk_list.len()) && (i != peek_result_ref(&result).1)) ==> old(chunk_list.lookup(i)) == chunk_list.lookup(i))
     )] 
     #[ensures(result.is_ok() ==> 
-        forall(|i: usize| ((0 <= i && i < chunk_list.len()) && (i != peek_result_ref(&result).1)) && old(chunk_list.lookup(i)).is_some()
+        forall(|i: usize| ((0 <= i && i < chunk_list.len()) ) && old(chunk_list.lookup(i)).is_some()
             ==> !range_overlaps(&peek_option(&old(chunk_list.lookup(i))), &chunk_range))
     )] 
     fn new_pre_heap(chunk_range: RangeInclusive<usize>, chunk_list: &mut StaticArray) -> Result<(TrustedChunk, usize), ChunkCreationError> {
