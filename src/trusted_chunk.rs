@@ -39,7 +39,7 @@ pub struct TrustedChunkAllocator {
 
 impl TrustedChunkAllocator {
     /// Creates an allocator with empty bookkeeping structures
-    pub fn new() -> TrustedChunkAllocator {
+    pub const fn new() -> TrustedChunkAllocator {
         TrustedChunkAllocator { heap_init: false, list: List::new(), array: StaticArray::new() }
     }
 
