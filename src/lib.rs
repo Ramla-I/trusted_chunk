@@ -1,4 +1,4 @@
-#![cfg_attr(feature = "without_std", no_std)]
+#![cfg_attr(not(std), no_std)]
 #![feature(box_patterns)]
 #![allow(unused)]
 #![feature(step_trait)]
