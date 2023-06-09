@@ -38,10 +38,32 @@ impl StaticArray {
         self.arr[index]
     }
 
-    /// Looks up an element in the array and returns its start and end.
+    /// Sets the the element at `index` with the value `elem`.
     /// 
     /// # Pre-conditions:
-    /// * index is less than the length
+    /// * Index is less than the length
+    /// 
+    /// # Post-conditions:
+    /// * The element at `index` is equal to `elem`
+    /// * All other elements not at `index` remain unchanged
+    #[requires(0 <= index && index < self.len())]
+    #[ensures(self.arr[index] == elem)]
+    #[ensures(forall(|i: usize| ((0 <= i && i < self.arr.len()) && i != index) ==> self.arr[i] == old(self.arr[i])))]
+    pub(crate) fn set_element(&mut self, index: usize, elem: Option<RangeInclusive<usize>>) {
+        self.arr[index] = elem;
+    }
+
+
+    /// Looks up an element in the array and returns its start and end value.
+    /// This has to be trusted because we access the RangeInclusive start and end values
+    /// which we've already seen leads to internal compiler errors due to generics.
+    /// 
+    /// # Pre-conditions:
+    /// * Index is less than the length
+    /// 
+    /// # Post-conditions:
+    /// * The returned values are the start and end of the RangeInclusive at `index`
+    /// * If there is no element at `index`, then None is returned
     #[pure]
     #[trusted]
     #[requires(0 <= index && index < self.len())]
@@ -52,20 +74,12 @@ impl StaticArray {
     )]
     #[ensures(result.is_none() ==> self.arr[index].is_none())]
     pub fn lookup_range_bounds(&self, index: usize) -> Option<((usize, usize))> {
-        if self.arr[index].is_some() {
-            let val = self.arr[index].unwrap();
-            Some((*val.start(), *val.end()))
-        } else {
-            None
+        match self.arr[index] {
+            Some(val) => Some((*val.start(), *val.end())),
+            None => None
         }
     }
 
-    #[requires(0 <= index && index < self.len())]
-    #[ensures(self.arr[index] == elem)]
-    #[ensures(forall(|i: usize| ((0 <= i && i < self.arr.len()) && i != index) ==> self.arr[i] == old(self.arr[i])))]
-    pub fn set_element(&mut self, index: usize, elem: Option<RangeInclusive<usize>>) {
-        self.arr[index] = elem;
-    }
 
     /// Adds an element to the array if there's space.
     /// 
@@ -93,7 +107,7 @@ impl StaticArray {
     #[ensures(result.is_ok() ==> 
         forall(|i: usize| ((0 <= i && i < self.arr.len()) && (i != peek_result(&result))) ==> old(self.arr[i]) == self.arr[i])
     )] 
-	pub fn push(&mut self, value: RangeInclusive<usize>) -> Result<usize,()> {
+	pub(crate) fn push(&mut self, value: RangeInclusive<usize>) -> Result<usize,()> {
         let mut i = 0;
 
         while i < self.arr.len() {
