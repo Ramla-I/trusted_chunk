@@ -91,9 +91,6 @@ impl TrustedChunkAllocator {
 
     /// The only public interface to create a `TrustedChunk`.
     /// 
-    /// # Pre-conditions:
-    /// * `chunk_range` is not empty
-    /// 
     /// # Post-conditions:
     /// * If ChunkCreationError::Overlap(idx) is returned, then `chunk_range` overlaps with the element at index idx
     /// * If successful, then result is equal to `chunk_range`
@@ -103,7 +100,6 @@ impl TrustedChunkAllocator {
     /// # Verification Notes:
     /// We could bring all post-conditions from the TrustedChunk::new functions as post-conditions here
     /// but it gets extremenly verbose
-    #[requires(*chunk_range.start() <= *chunk_range.end())]
     #[ensures(result.is_err() ==> {
         match peek_err(&result) {
             ChunkCreationError::Overlap(idx) => {
@@ -187,7 +183,8 @@ impl TrustedChunk {
     /// Creates a new `TrustedChunk` with `chunk_range` if no other range in `chunk_list` overlaps with `chunk_range`
     /// and adds the range of the newly created `TrustedChunk` to `chunk_list`.
     /// Returns an Err if there is an overlap, with the error value being the index in `chunk_list` of the element which overlaps with `frames`.
-    #[requires(*chunk_range.start() <= *chunk_range.end())]
+    /// 
+    /// # Post-conditions:
     #[ensures(result.is_err() ==> {
         match peek_err(&result) {
             ChunkCreationError::Overlap(idx) => (idx < chunk_list.len()) & range_overlaps(&chunk_list.lookup(idx), &chunk_range),
@@ -209,6 +206,10 @@ impl TrustedChunk {
         forall(|i: usize| (0 <= i && i < old(chunk_list.len())) ==> !range_overlaps(&old(chunk_list.lookup(i)), &chunk_range))
     })]
     fn new(chunk_range: RangeInclusive<usize>, chunk_list: &mut List) -> Result<TrustedChunk, ChunkCreationError> {
+        if chunk_range.is_empty() {
+            return Err(ChunkCreationError::InvalidRange);
+        }
+
         let overlap_idx = chunk_list.elem_overlaps_in_list(chunk_range, 0);
         if overlap_idx.is_some(){
             Err(ChunkCreationError::Overlap(overlap_idx.unwrap()))
@@ -223,7 +224,9 @@ impl TrustedChunk {
     /// and adds the range of the newly created `TrustedChunk` to `chunk_list`.
     /// Returns an Err if there is an overlap, with the error value being the index in `chunk_list` of the element which overlaps with `frames`.
     /// Also returns an error if the `chunk_list` is full and no new element can be added.
-    #[requires(*chunk_range.start() <= *chunk_range.end())]
+    /// 
+    /// 
+    /// # Post-conditions:
     #[ensures(result.is_err() ==> {
         match peek_err(&result) {
             ChunkCreationError::Overlap(idx) => (idx < chunk_list.len()) && (chunk_list.lookup(idx).is_some()) && range_overlaps(&peek_option(&chunk_list.lookup(idx)), &chunk_range),
@@ -246,6 +249,10 @@ impl TrustedChunk {
             ==> !range_overlaps(&peek_option(&old(chunk_list.lookup(i))), &chunk_range))
     )] 
     fn new_pre_heap(chunk_range: RangeInclusive<usize>, chunk_list: &mut StaticArray) -> Result<(TrustedChunk, usize), ChunkCreationError> {
+        if chunk_range.is_empty() {
+            return Err(ChunkCreationError::InvalidRange);
+        }
+
         let overlap_idx = chunk_list.elem_overlaps_in_array(chunk_range, 0);
         if overlap_idx.is_some(){
             Err(ChunkCreationError::Overlap(overlap_idx.unwrap()))
