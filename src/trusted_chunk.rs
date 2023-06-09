@@ -38,10 +38,6 @@ impl TrustedChunkAllocator {
     }
 
     #[requires(*chunk_range.start() <= *chunk_range.end())]
-    #[ensures(result.is_ok() ==> {
-        let new_chunk = peek_result_ref(&result);
-        new_chunk.start() == *chunk_range.start() && new_chunk.end() == *chunk_range.end()
-    })]
     #[ensures(result.is_err() ==> {
         match peek_err(&result) {
             ChunkCreationError::Overlap(idx) => {
@@ -51,17 +47,32 @@ impl TrustedChunkAllocator {
             _ => true
         }
     })]
-    #[ensures(result.is_ok() && self.heap_init ==> {
-        forall(|i: usize| (0 <= i && i < old(self.list.len())) ==> !range_overlaps(&old(self.list.lookup(i)), &chunk_range))
+    #[ensures(result.is_ok() ==> {
+        let (new_chunk, _) = peek_result_ref(&result);
+        new_chunk.start() == *chunk_range.start() && new_chunk.end() == *chunk_range.end()
     })]
-    pub fn create_chunk(&mut self, chunk_range: RangeInclusive<usize>) -> Result<TrustedChunk, ChunkCreationError> {
+    #[ensures(result.is_ok() ==> {
+        (self.heap_init && forall(|i: usize| (0 <= i && i < old(self.list.len())) ==> !range_overlaps(&old(self.list.lookup(i)), &chunk_range)))
+        ||
+        (!self.heap_init && forall(|i: usize| ((0 <= i && i < self.array.len()) && (i != peek_result_ref(&result).1)) && old(self.array.lookup(i)).is_some()
+            ==> !range_overlaps(&peek_option(&old(self.array.lookup(i))), &chunk_range)))
+    })]
+    #[ensures(result.is_ok() ==> {
+        (self.heap_init && self.list.len() >= 1 && self.list.lookup(0) == chunk_range)
+        ||
+        (!self.heap_init && {
+            let idx = peek_result_ref(&result).1;
+            idx < self.array.len() && self.array.lookup(idx).is_some() && peek_option(&self.array.lookup(idx)) == chunk_range
+        })
+    })]
+    pub fn create_chunk(&mut self, chunk_range: RangeInclusive<usize>) -> Result<(TrustedChunk, usize), ChunkCreationError> {
         if self.heap_init {
-            TrustedChunk::new(chunk_range, &mut self.list)
-        } else {
-            match TrustedChunk::new_pre_heap(chunk_range, &mut self.array){ // can't use map because Prusti can't reason about the return value then
-                Ok((chunk, idx)) => Ok(chunk),
+            match TrustedChunk::new(chunk_range, &mut self.list) { // can't use map because Prusti can't reason about the return value then
+                Ok(chunk) => Ok((chunk, 0)),
                 Err(e) => Err(e)
             }
+        } else {
+            TrustedChunk::new_pre_heap(chunk_range, &mut self.array)
         }
     }
 }
