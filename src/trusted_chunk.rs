@@ -143,12 +143,9 @@ impl TrustedChunkAllocator {
     }
 }
 
-/// A struct representing a unique unallocated region in memory.
-/// An instantiation of this struct is formally verified to not overlap with any other `TrustedChunk` in the system.
-/// 
-/// # Warning
-/// A `RangeInclusive` is created with the precondition that start <= end.
-/// Outside of verified code, it is the caller's responsibility to make sure that precondition is upheld.
+
+/// A struct representing an unallocated region in memory.
+/// Its public functions are formally verified to prevent range overlaps between chunks.
 #[cfg_attr(not(prusti), derive(Debug, PartialEq, Eq))]
 pub struct TrustedChunk {
     frames: RangeInclusive<usize>
@@ -187,9 +184,8 @@ impl TrustedChunk {
 
     }
 
-    /// If no other range in `chunk_list` overlaps with `frames`:
-    /// * creates a new `TrustedChunk` with `frames`  
-    /// * adds the range of the newly created `TrustedChunk` to `chunk_list`.
+    /// Creates a new `TrustedChunk` with `chunk_range` if no other range in `chunk_list` overlaps with `chunk_range`
+    /// and adds the range of the newly created `TrustedChunk` to `chunk_list`.
     /// Returns an Err if there is an overlap, with the error value being the index in `chunk_list` of the element which overlaps with `frames`.
     #[requires(*chunk_range.start() <= *chunk_range.end())]
     #[ensures(result.is_err() ==> {
@@ -223,6 +219,10 @@ impl TrustedChunk {
     }
 
 
+    /// Creates a new `TrustedChunk` with `chunk_range` if no other range in `chunk_list` overlaps with `chunk_range`
+    /// and adds the range of the newly created `TrustedChunk` to `chunk_list`.
+    /// Returns an Err if there is an overlap, with the error value being the index in `chunk_list` of the element which overlaps with `frames`.
+    /// Also returns an error if the `chunk_list` is full and no new element can be added.
     #[requires(*chunk_range.start() <= *chunk_range.end())]
     #[ensures(result.is_err() ==> {
         match peek_err(&result) {
@@ -257,8 +257,7 @@ impl TrustedChunk {
         }
     }
 
-    /// Internal function that creates a chunk without any checks.
-    /// Only to be used in the split() function.
+    /// Private function that creates a chunk without any checks.
     #[requires(*frames.start() <= *frames.end())]
     #[ensures(result.start() == *frames.start())]
     #[ensures(result.end() == *frames.end())]
@@ -267,7 +266,7 @@ impl TrustedChunk {
     }
 
 
-    /// Splits a chunk in to 1-3 chunks, depending on where the split is at.
+    /// Splits a chunk into 1-3 chunks, depending on where the split is at.
     /// It is formally verified that the resulting chunks are disjoint, contiguous and their start/end is equal to that of the original chunk.
     #[ensures(result.is_ok() ==> {
         let split_chunk = peek_result_ref(&result);
@@ -304,6 +303,8 @@ impl TrustedChunk {
     }
 
 
+    /// Splits a chunk into 2 chunks at the frame with number `at_frame`.
+    /// It is formally verified that the resulting chunks are disjoint, contiguous and their start/end is equal to that of the original chunk.
     #[ensures(result.is_ok() ==> {
         let split_chunk = peek_result_ref(&result);
         split_chunk.0.is_empty() && !split_chunk.1.is_empty() ||
@@ -312,15 +313,15 @@ impl TrustedChunk {
     })]
     #[ensures(result.is_ok() ==> {
         let split_chunk = peek_result_ref(&result);
-        split_chunk.0.is_empty() ==> split_chunk.1.start() == old(self.start()) && split_chunk.1.end() == old(self.end())
+        split_chunk.0.is_empty() ==> (split_chunk.1.start() == old(self.start()) && split_chunk.1.end() == old(self.end()))
     })]
     #[ensures(result.is_ok() ==> {
         let split_chunk = peek_result_ref(&result);
-        split_chunk.1.is_empty() ==> split_chunk.0.start() == old(self.start()) && split_chunk.0.end() == old(self.end())
+        split_chunk.1.is_empty() ==> (split_chunk.0.start() == old(self.start()) && split_chunk.0.end() == old(self.end()))
     })]
     #[ensures(result.is_ok() ==> {
         let split_chunk = peek_result_ref(&result);
-        !split_chunk.0.is_empty() && !split_chunk.1.is_empty() ==> {
+        (!split_chunk.0.is_empty() && !split_chunk.1.is_empty()) ==> {
             split_chunk.0.start() == old(self.start()) && split_chunk.0.end() == at_frame - 1 &&
             split_chunk.1.start() == at_frame && split_chunk.1.end() == old(self.end())
         }
@@ -334,7 +335,6 @@ impl TrustedChunk {
 
         let (first, second) = if at_frame == self.start() && at_frame <= self.end() {
             let first  = TrustedChunk::empty();
-            // prusti_assert!(first.is_empty());
             let second = TrustedChunk::trusted_new(RangeInclusive::new(at_frame, self.end()));
             (first, second)
         } 
