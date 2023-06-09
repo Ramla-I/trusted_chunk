@@ -33,8 +33,38 @@ impl TrustedChunkAllocator {
         TrustedChunkAllocator { heap_init: false, list: List::new(), array: StaticArray::new() }
     }
 
-    pub fn switch_to_heap_allocated(&mut self) {
+    #[requires(self.list.len() == 0)]
+    #[ensures(result.is_ok() ==> self.heap_init)]
+    #[ensures(result.is_ok() ==> forall(|i: usize| (0 <= i && i < self.array.arr.len()) ==> self.array.arr[i].is_none()))]
+    #[ensures(result.is_ok() ==> forall(|i: usize, j: usize| (0 <= i && i < self.list.len() && 0 <= j && j < self.list.len()) ==> 
+        (i != j ==> !range_overlaps(&self.list.lookup(i), &self.list.lookup(j))))
+    )]
+    pub fn switch_to_heap_allocated(&mut self) -> Result<(),()> {
+        if self.heap_init {
+            return Err(());
+        }
+
+        let mut i = 0;
+        while i < self.array.arr.len() {
+            body_invariant!(forall(|i: usize, j: usize| (0 <= i && i < self.list.len() && 0 <= j && j < self.list.len()) ==> 
+                (i != j ==> !range_overlaps(&self.list.lookup(i), &self.list.lookup(j))))
+            );
+            body_invariant!(forall(|j: usize| ((0 <= j && j < i) ==> self.array.arr[j].is_none())));
+            body_invariant!(i < self.array.arr.len());
+            body_invariant!(i >= 0);
+
+            let range = self.array.lookup_range_bounds(i);
+            if range.is_some() {
+                let (start, end) = range.unwrap();
+                match self.list.push_unique_with_precond(RangeInclusive::new(start, end)) {
+                    Ok(()) => self.array.set_element(i, None),
+                    Err(_) => return Err(())
+                }
+            }
+            i += 1;
+        }
         self.heap_init = true;
+        Ok(())
     }
 
     #[requires(*chunk_range.start() <= *chunk_range.end())]

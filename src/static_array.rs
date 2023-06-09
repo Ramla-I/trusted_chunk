@@ -12,7 +12,7 @@ use crate::{
 use core::mem;
 
 pub struct StaticArray  {
-    arr: [Option<RangeInclusive<usize>>; 64]
+    pub(crate) arr: [Option<RangeInclusive<usize>>; 64]
 }
 
 impl StaticArray {
@@ -38,6 +38,34 @@ impl StaticArray {
         self.arr[index]
     }
 
+    /// Looks up an element in the array and returns its start and end.
+    /// 
+    /// # Pre-conditions:
+    /// * index is less than the length
+    #[pure]
+    #[trusted]
+    #[requires(0 <= index && index < self.len())]
+    #[ensures(result.is_some() ==> 
+        self.arr[index].is_some() && 
+        *peek_option(&self.arr[index]).start() == peek_option(&result).0 && 
+        *peek_option(&self.arr[index]).end() == peek_option(&result).1
+    )]
+    #[ensures(result.is_none() ==> self.arr[index].is_none())]
+    pub fn lookup_range_bounds(&self, index: usize) -> Option<((usize, usize))> {
+        if self.arr[index].is_some() {
+            let val = self.arr[index].unwrap();
+            Some((*val.start(), *val.end()))
+        } else {
+            None
+        }
+    }
+
+    #[requires(0 <= index && index < self.len())]
+    #[ensures(self.arr[index] == elem)]
+    #[ensures(forall(|i: usize| ((0 <= i && i < self.arr.len()) && i != index) ==> self.arr[i] == old(self.arr[i])))]
+    pub fn set_element(&mut self, index: usize, elem: Option<RangeInclusive<usize>>) {
+        self.arr[index] = elem;
+    }
 
     /// Adds an element to the array if there's space.
     /// 

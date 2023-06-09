@@ -16,6 +16,10 @@ impl<T: PartialEq + Copy> core::option::Option<T> {
     #[requires(self.is_some())]
     #[ensures(result == peek_option(&self))]
     pub fn unwrap(self) -> T;
+
+    #[ensures(result.is_some() ==> (old(self.is_some()) && old(peek_option(&self)) == peek_option(&result)))]
+    #[ensures(result.is_none() ==> old(self.is_none()))]
+    pub fn take(&mut self) -> Option<T>;
 }
 
 #[extern_spec]
