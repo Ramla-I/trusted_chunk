@@ -38,12 +38,30 @@ impl TrustedChunkAllocator {
     }
 
     #[requires(*chunk_range.start() <= *chunk_range.end())]
+    #[ensures(result.is_ok() ==> {
+        let new_chunk = peek_result_ref(&result);
+        new_chunk.start() == *chunk_range.start() && new_chunk.end() == *chunk_range.end()
+    })]
+    #[ensures(result.is_err() ==> {
+        match peek_err(&result) {
+            ChunkCreationError::Overlap(idx) => {
+                (self.heap_init && (idx < self.list.len()) & range_overlaps(&self.list.lookup(idx), &chunk_range)) ||
+                (!self.heap_init && (idx < self.array.len()) && (self.array.lookup(idx).is_some()) && range_overlaps(&peek_option(&self.array.lookup(idx)), &chunk_range))
+            },
+            _ => true
+        }
+    })]
+    #[ensures(result.is_ok() && self.heap_init ==> {
+        forall(|i: usize| (0 <= i && i < old(self.list.len())) ==> !range_overlaps(&old(self.list.lookup(i)), &chunk_range))
+    })]
     pub fn create_chunk(&mut self, chunk_range: RangeInclusive<usize>) -> Result<TrustedChunk, ChunkCreationError> {
         if self.heap_init {
             TrustedChunk::new(chunk_range, &mut self.list)
         } else {
-            TrustedChunk::new_pre_heap(chunk_range, &mut self.array)
-                .map(|(c,idx)| c)
+            match TrustedChunk::new_pre_heap(chunk_range, &mut self.array){ // can't use map because Prusti can't reason about the return value then
+                Ok((chunk, idx)) => Ok(chunk),
+                Err(e) => Err(e)
+            }
         }
     }
 }
@@ -96,70 +114,67 @@ impl TrustedChunk {
     /// * creates a new `TrustedChunk` with `frames`  
     /// * adds the range of the newly created `TrustedChunk` to `chunk_list`.
     /// Returns an Err if there is an overlap, with the error value being the index in `chunk_list` of the element which overlaps with `frames`.
-    #[requires(*frames.start() <= *frames.end())]
-    #[ensures(result.is_ok() ==> peek_result_ref(&result).start() == *frames.start())]
-    #[ensures(result.is_ok() ==> peek_result_ref(&result).end() == *frames.end())]
+    #[requires(*chunk_range.start() <= *chunk_range.end())]
     #[ensures(result.is_err() ==> {
         match peek_err(&result) {
-            ChunkCreationError::Overlap(idx) => (idx < chunk_list.len()) & range_overlaps(&chunk_list.lookup(idx), &frames),
+            ChunkCreationError::Overlap(idx) => (idx < chunk_list.len()) & range_overlaps(&chunk_list.lookup(idx), &chunk_range),
             _ => true
         }
     })]
-    #[ensures(result.is_ok() ==> chunk_list.len() >= 1)]
     #[ensures(result.is_ok() ==> {
-        chunk_list.lookup(0) == frames
+        let new_chunk = peek_result_ref(&result);
+        new_chunk.start() == *chunk_range.start() && new_chunk.end() == *chunk_range.end()
     })]
     #[ensures(result.is_ok() ==> {
-        forall(|i: usize| (0 <= i && i < old(chunk_list.len())) ==> !range_overlaps(&old(chunk_list.lookup(i)), &frames))
+        chunk_list.len() >= 1 && chunk_list.lookup(0) == chunk_range
     })]
     #[ensures(result.is_ok() ==> chunk_list.len() == old(chunk_list.len()) + 1)] 
     #[ensures(result.is_ok() ==> {
         forall(|i: usize| (1 <= i && i < chunk_list.len()) ==> old(chunk_list.lookup(i-1)) == chunk_list.lookup(i))
     })]
-    fn new(frames: RangeInclusive<usize>, chunk_list: &mut List) -> Result<TrustedChunk, ChunkCreationError> {
-        let overlap_idx = chunk_list.elem_overlaps_in_list(frames, 0);
+    #[ensures(result.is_ok() ==> {
+        forall(|i: usize| (0 <= i && i < old(chunk_list.len())) ==> !range_overlaps(&old(chunk_list.lookup(i)), &chunk_range))
+    })]
+    fn new(chunk_range: RangeInclusive<usize>, chunk_list: &mut List) -> Result<TrustedChunk, ChunkCreationError> {
+        let overlap_idx = chunk_list.elem_overlaps_in_list(chunk_range, 0);
         if overlap_idx.is_some(){
             Err(ChunkCreationError::Overlap(overlap_idx.unwrap()))
         } else {
-            chunk_list.push(frames);
-            Ok(TrustedChunk { frames })
+            chunk_list.push(chunk_range);
+            Ok(TrustedChunk { frames: chunk_range })
         }
     }
 
-    #[requires(*frames.start() <= *frames.end())]
+
+    #[requires(*chunk_range.start() <= *chunk_range.end())]
     #[ensures(result.is_err() ==> {
         match peek_err(&result) {
-            ChunkCreationError::Overlap(idx) => (idx < chunk_list.len()) && (chunk_list.lookup(idx).is_some()) && range_overlaps(&peek_option(&chunk_list.lookup(idx)), &frames),
+            ChunkCreationError::Overlap(idx) => (idx < chunk_list.len()) && (chunk_list.lookup(idx).is_some()) && range_overlaps(&peek_option(&chunk_list.lookup(idx)), &chunk_range),
             _ => true
         }
     })]
-    #[ensures(result.is_ok() ==> peek_result_ref(&result).0.start() == *frames.start())]
-    #[ensures(result.is_ok() ==> peek_result_ref(&result).0.end() == *frames.end())]
     #[ensures(result.is_ok() ==> {
-        peek_result_ref(&result).1 < chunk_list.len()
+        let (new_chunk, _) = peek_result_ref(&result);
+        new_chunk.start() == *chunk_range.start() && new_chunk.end() == *chunk_range.end()
     })]
     #[ensures(result.is_ok() ==> {
         let idx = peek_result_ref(&result).1;
-        chunk_list.lookup(idx).is_some()
-    })]
-    #[ensures(result.is_ok() ==> {
-        let idx = peek_result_ref(&result).1;
-        peek_option(&chunk_list.lookup(idx)) == frames
+        idx < chunk_list.len() && chunk_list.lookup(idx).is_some() && peek_option(&chunk_list.lookup(idx)) == chunk_range
     })]
     #[ensures(result.is_ok() ==> 
         forall(|i: usize| ((0 <= i && i < chunk_list.len()) && (i != peek_result_ref(&result).1)) ==> old(chunk_list.lookup(i)) == chunk_list.lookup(i))
     )] 
     #[ensures(result.is_ok() ==> 
         forall(|i: usize| ((0 <= i && i < chunk_list.len()) && (i != peek_result_ref(&result).1)) && old(chunk_list.lookup(i)).is_some()
-            ==> !range_overlaps(&peek_option(&old(chunk_list.lookup(i))), &frames))
+            ==> !range_overlaps(&peek_option(&old(chunk_list.lookup(i))), &chunk_range))
     )] 
-    fn new_pre_heap(frames: RangeInclusive<usize>, chunk_list: &mut StaticArray) -> Result<(TrustedChunk, usize), ChunkCreationError> {
-        let overlap_idx = chunk_list.elem_overlaps_in_array(frames, 0);
+    fn new_pre_heap(chunk_range: RangeInclusive<usize>, chunk_list: &mut StaticArray) -> Result<(TrustedChunk, usize), ChunkCreationError> {
+        let overlap_idx = chunk_list.elem_overlaps_in_array(chunk_range, 0);
         if overlap_idx.is_some(){
             Err(ChunkCreationError::Overlap(overlap_idx.unwrap()))
         } else {
-            match chunk_list.push(frames){
-                Ok(idx) => Ok((TrustedChunk { frames }, idx)),
+            match chunk_list.push(chunk_range){
+                Ok(idx) => Ok((TrustedChunk { frames: chunk_range }, idx)),
                 Err(()) => Err(ChunkCreationError::NoSpace)
             }
         }
