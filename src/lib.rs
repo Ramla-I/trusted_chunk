@@ -15,7 +15,7 @@ pub(crate) mod external_spec;
 pub mod linked_list;
 pub mod static_array;
 pub mod trusted_chunk;
-// mod test;
+mod test;
 
 cfg_if::cfg_if! {
 if #[cfg(prusti)] {

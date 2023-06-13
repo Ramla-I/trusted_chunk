@@ -1,95 +1,60 @@
-// use crate::*;
+use crate::*;
+use crate::trusted_chunk::*;
 
-// #[test]
-// fn decreasing_range_inclusive_test() {
-//     let unallocated_regions = [None, None, None, None, None, None, None, None, None, None,
-//                                 None, None, None, None, None,None, None, None, None, None,
-//                                 None, None, None, None, None,None, None, None, None, None,
-//                                 None, None];
-//     let mut chunk_list = convert_unallocated_regions_to_chunks(unallocated_regions);
-//     assert!(chunk_list.is_ok());
-//     let mut chunk_list = chunk_list.unwrap();
+#[test]
+fn chunk_allocator_test() {
+    let mut allocator = TrustedChunkAllocator::new();
+    let mut chunk;
+    chunk = allocator.create_chunk(RangeInclusive::new(0,1));
+    assert!(chunk.is_ok());
+    chunk = allocator.create_chunk(RangeInclusive::new(0,1)); // equivalent
+    assert!(chunk.is_err());
+    chunk = allocator.create_chunk(RangeInclusive::new(5,1)); // empty range
+    assert!(chunk.is_err());
+    chunk = allocator.create_chunk(RangeInclusive::new(4,10)); // disjoint
+    assert!(chunk.is_ok());
+    chunk = allocator.create_chunk(RangeInclusive::new(10,12)); // upper range bound overlap
+    assert!(chunk.is_err());
+    chunk = allocator.create_chunk(RangeInclusive::new(3,4)); // lower range bound overlap
+    assert!(chunk.is_err());
 
-//     let chunk1 = create_new_trusted_chunk(RangeInclusive::new(10, 0), &mut chunk_list);
-//     assert!(chunk1.is_err());
+    assert_eq!(allocator.array.lookup(0), Some(RangeInclusive::new(0,1)));
+    assert_eq!(allocator.array.lookup(1), Some(RangeInclusive::new(4,10)));
 
-//     let chunk2 = create_new_trusted_chunk(RangeInclusive::new(11, 7), &mut chunk_list);
-//     assert!(chunk2.is_err());
-// }
+    for i in 2..allocator.array.len() {
+        assert_eq!(allocator.array.lookup(i), None);
+    }
 
-// #[test]
-// fn disjoint_ranges() {
-//     let unallocated_regions = [None, None, None, None, None, None, None, None, None, None,
-//                                 None, None, None, None, None,None, None, None, None, None,
-//                                 None, None, None, None, None,None, None, None, None, None,
-//                                 None, None];
-//     let mut chunk_list = convert_unallocated_regions_to_chunks(unallocated_regions);
-//     assert!(chunk_list.is_ok());
-//     let mut chunk_list = chunk_list.unwrap();
+    let res = allocator.switch_to_heap_allocated();
+    assert!(res.is_ok());
 
-//     let chunk1 = create_new_trusted_chunk(RangeInclusive::new(0, 10), &mut chunk_list);
-//     assert!(chunk1.is_ok());
+    let res = allocator.switch_to_heap_allocated();
+    assert!(res.is_err());
 
-//     let chunk2 = create_new_trusted_chunk(RangeInclusive::new(11, 20), &mut chunk_list);
-//     assert!(chunk2.is_ok());
-// }
+    for i in 0..allocator.array.len() {
+        assert_eq!(allocator.array.lookup(i), None);
+    }
 
+    assert_eq!(allocator.list.len(), 2);
+    assert_eq!(allocator.list.lookup(1), RangeInclusive::new(0,1));
+    assert_eq!(allocator.list.lookup(0), RangeInclusive::new(4,10));
 
-// #[test]
-// fn equivalent_ranges() {
-//     let unallocated_regions = [None, None, None, None, None, None, None, None, None, None,
-//                                 None, None, None, None, None,None, None, None, None, None,
-//                                 None, None, None, None, None,None, None, None, None, None,
-//                                 None, None];
-//     let mut chunk_list = convert_unallocated_regions_to_chunks(unallocated_regions);
-//     assert!(chunk_list.is_ok());
-//     let mut chunk_list = chunk_list.unwrap();
+    chunk = allocator.create_chunk(RangeInclusive::new(7,12)); // multiple overlap
+    assert!(chunk.is_err());
+    chunk = allocator.create_chunk(RangeInclusive::new(10, 11)); // start range bound overlap
+    assert!(chunk.is_err());
+    chunk = allocator.create_chunk(RangeInclusive::new(11, 11));
+    assert!(chunk.is_ok());
+    chunk = allocator.create_chunk(RangeInclusive::new(11, 15)); // end range bound overlap
+    assert!(chunk.is_err());
+    chunk = allocator.create_chunk(RangeInclusive::new(1, 0)); // empty
+    assert!(chunk.is_err());
+    chunk = allocator.create_chunk(RangeInclusive::new(12, 15));
+    assert!(chunk.is_ok());
 
-//     let chunk1 = create_new_trusted_chunk(RangeInclusive::new(0, 10), &mut chunk_list);
-//     assert!(chunk1.is_ok());
-
-//     let chunk2 = create_new_trusted_chunk(RangeInclusive::new(0, 10), &mut chunk_list);
-//     assert!(chunk2.is_err());
-// }
-
-
-// #[test]
-// fn lower_bound_overlap() {
-//     let unallocated_regions = [None, None, None, None, None, None, None, None, None, None,
-//                                 None, None, None, None, None,None, None, None, None, None,
-//                                 None, None, None, None, None,None, None, None, None, None,
-//                                 None, None];
-//     let mut chunk_list = convert_unallocated_regions_to_chunks(unallocated_regions);
-//     assert!(chunk_list.is_ok());
-//     let mut chunk_list = chunk_list.unwrap();
-
-//     let chunk1 = create_new_trusted_chunk(RangeInclusive::new(10, 20), &mut chunk_list);
-//     assert!(chunk1.is_ok());
-
-//     let chunk2 = create_new_trusted_chunk(RangeInclusive::new(0, 10), &mut chunk_list);
-//     assert!(chunk2.is_err());
-
-//     let chunk3 = create_new_trusted_chunk(RangeInclusive::new(0, 13), &mut chunk_list);
-//     assert!(chunk3.is_err());
-// }
-
-
-// #[test]
-// fn upper_bound_overlap() {
-//     let unallocated_regions = [None, None, None, None, None, None, None, None, None, None,
-//                                 None, None, None, None, None,None, None, None, None, None,
-//                                 None, None, None, None, None,None, None, None, None, None,
-//                                 None, None];
-//     let mut chunk_list = convert_unallocated_regions_to_chunks(unallocated_regions);
-//     assert!(chunk_list.is_ok());
-//     let mut chunk_list = chunk_list.unwrap();
-
-//     let chunk1 = create_new_trusted_chunk(RangeInclusive::new(10, 20), &mut chunk_list);
-//     assert!(chunk1.is_ok());
-
-//     let chunk2 = create_new_trusted_chunk(RangeInclusive::new(20, 30), &mut chunk_list);
-//     assert!(chunk2.is_err());
-
-//     let chunk3 = create_new_trusted_chunk(RangeInclusive::new(15, 30), &mut chunk_list);
-//     assert!(chunk3.is_err());
-// }
+    assert_eq!(allocator.list.len(), 4);
+    assert_eq!(allocator.list.lookup(3), RangeInclusive::new(0,1));
+    assert_eq!(allocator.list.lookup(2), RangeInclusive::new(4,10));
+    assert_eq!(allocator.list.lookup(1), RangeInclusive::new(11,11));
+    assert_eq!(allocator.list.lookup(0), RangeInclusive::new(12,15));
+}

@@ -15,7 +15,7 @@ use crate::{
 };
 
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub enum ChunkCreationError {
     /// There was already a `TrustedChunk` created with an overlapping range
     Overlap(usize),
@@ -32,9 +32,9 @@ pub enum ChunkCreationError {
 /// After the heap is initialized, the ranges stored in `array` are shifted to a linked list and the 
 /// linked list is used to bookkeep all further allocations.
 pub struct TrustedChunkAllocator {
-    heap_init: bool,
-    list: List,
-    array: StaticArray
+    pub(crate) heap_init: bool,
+    pub(crate) list: List,
+    pub(crate) array: StaticArray
 }
 
 impl TrustedChunkAllocator {
@@ -69,15 +69,19 @@ impl TrustedChunkAllocator {
 
         let mut i = 0;
         while i < self.array.arr.len() {
+            // body_invariant!(forall(|i: usize| (0 <= i && i < self.list.len()) ==> {
+            //     exists(|j: usize| 0 <= j && j < self.array.len() && self.array.lookup(j).is_some() && self.list.lookup(i) == peek_option(&self.array.lookup(j)))
+            // })
+            // );
+            body_invariant!(forall(|j: usize| ((0 <= j && j < i) ==> self.array.arr[j].is_none())));
             body_invariant!(forall(|i: usize, j: usize| (0 <= i && i < self.list.len() && 0 <= j && j < self.list.len()) ==> 
                 (i != j ==> !range_overlaps(&self.list.lookup(i), &self.list.lookup(j))))
             );
-            body_invariant!(forall(|j: usize| ((0 <= j && j < i) ==> self.array.arr[j].is_none())));
             body_invariant!(i < self.array.arr.len());
             body_invariant!(i >= 0);
 
-            if let Some((start, end)) = self.array.lookup_range_bounds(i) {
-                match self.list.push_unique_with_precond(RangeInclusive::new(start, end)) {
+            if let Some(range) = self.array.lookup(i) {
+                match self.list.push_unique_with_precond(range) {
                     Ok(()) => self.array.set_element(i, None),
                     Err(_) => return Err(())
                 }
@@ -141,7 +145,7 @@ impl TrustedChunkAllocator {
 
 
 /// A struct representing an unallocated region in memory.
-/// Its public functions are formally verified to prevent range overlaps between chunks.
+/// Its functions are formally verified to prevent range overlaps between chunks.
 #[cfg_attr(not(prusti), derive(Debug, PartialEq, Eq))]
 pub struct TrustedChunk {
     frames: RangeInclusive<usize>

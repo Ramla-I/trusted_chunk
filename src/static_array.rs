@@ -34,6 +34,7 @@ impl StaticArray {
     /// * index is less than the length
     #[pure]
     #[requires(0 <= index && index < self.len())]
+    #[ensures(result == self.arr[index])]
     pub fn lookup(&self, index: usize) -> Option<RangeInclusive<usize>> {
         self.arr[index]
     }
