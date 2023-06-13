@@ -189,6 +189,12 @@ impl TrustedChunk {
     /// Returns an Err if there is an overlap, with the error value being the index in `chunk_list` of the element which overlaps with `frames`.
     /// 
     /// # Post-conditions:
+    /// * If it fails than there was an overlap with an existing chunk or an empty range was passed as an argument
+    /// * If it succeeds, then the newly created chunk has the same bounds as `chunk_range`
+    /// * If it succeeds, then `chunk_range` is added to the list
+    /// * If it succeeds, then the length of `chunk_list` has increased by 1
+    /// * If it succeeds, then all other elements in the `chunk_list` remain unchanged
+    /// * If it succeeds, then `chunk_range` did not overlap with any element in the old `chunk_list`
     #[ensures(result.is_err() ==> {
         match peek_err(&result) {
             ChunkCreationError::Overlap(idx) => (idx < chunk_list.len()) & range_overlaps(&chunk_list.lookup(idx), &chunk_range),
@@ -229,8 +235,12 @@ impl TrustedChunk {
     /// Returns an Err if there is an overlap, with the error value being the index in `chunk_list` of the element which overlaps with `frames`.
     /// Also returns an error if the `chunk_list` is full and no new element can be added.
     /// 
-    /// 
     /// # Post-conditions:
+    /// * If it fails than there was an overlap with an existing chunk, there's no more room in the array or an empty range was passed as an argument
+    /// * If it succeeds, then the newly created chunk has the same bounds as `chunk_range`
+    /// * If it succeeds, then `chunk_range` is added to the list
+    /// * If it succeeds, then all other elements in the `chunk_list` remain unchanged
+    /// * If it succeeds, then `chunk_range` did not overlap with any element in the old `chunk_list`
     #[ensures(result.is_err() ==> {
         match peek_err(&result) {
             ChunkCreationError::Overlap(idx) => (idx < chunk_list.len()) && (chunk_list.lookup(idx).is_some()) && range_overlaps(&peek_option(&chunk_list.lookup(idx)), &chunk_range),
@@ -269,6 +279,8 @@ impl TrustedChunk {
     }
 
     /// Private function that creates a chunk without any checks.
+    /// 
+    /// Only used within other verified functions, or registered as a callback
     #[requires(*frames.start() <= *frames.end())]
     #[ensures(result.start() == *frames.start())]
     #[ensures(result.end() == *frames.end())]
@@ -279,6 +291,12 @@ impl TrustedChunk {
 
     /// Splits a chunk into 1-3 chunks, depending on where the split is at.
     /// It is formally verified that the resulting chunks are disjoint, contiguous and their start/end is equal to that of the original chunk.
+    /// 
+    /// # Post-conditions:
+    /// * If it succeeds, then the resulting chunks have no overlapping ranges
+    /// * If it succeeds, then the resulting chunks are contiguous
+    /// * If it succeeds, then the resulting chunks combined have the same range as `self`
+    /// * If it fails, then the original chunk is returned
     #[ensures(result.is_ok() ==> {
         let split_chunk = peek_result_ref(&result);
         split_chunk_has_no_overlapping_ranges(&split_chunk.0, &split_chunk.1, &split_chunk.2)
@@ -316,6 +334,13 @@ impl TrustedChunk {
 
     /// Splits a chunk into 2 chunks at the frame with number `at_frame`.
     /// It is formally verified that the resulting chunks are disjoint, contiguous and their start/end is equal to that of the original chunk.
+    /// 
+    /// # Post-conditions:
+    /// * If it succeeds, then both chunks can't be empty
+    /// * If it succeeds and the first chunk is empty, then the second chunk is equal to `self`
+    /// * If it succeeds and the second chunk is empty, then the first chunk is equal to `self`
+    /// * If it succeeds and both chunks aren't empty, then the chunks are contiguous and their combined range is equal to the range of `self`
+    /// * If it fails, then the original chunk is returned
     #[ensures(result.is_ok() ==> {
         let split_chunk = peek_result_ref(&result);
         split_chunk.0.is_empty() && !split_chunk.1.is_empty() ||
@@ -370,6 +395,11 @@ impl TrustedChunk {
 
     /// Merges `other` into `self`.
     /// Succeeds if `other` lies right before `self` or right after.
+    /// 
+    /// # Post-conditions:
+    /// * If it succeeds, then `other` and `self` were contiguous, and either `self`'s start bound has been updated to `other`'s start 
+    /// or `self`s end has been updated to `other`'s end
+    /// * If it fails, then `self` remains unchanged and `other` is returned
     #[ensures(result.is_ok() ==> 
         (old(self.start()) == other.end() + 1 && self.start() == other.start() && self.end() == old(self.end())) 
         || 
