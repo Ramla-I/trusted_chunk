@@ -15,7 +15,8 @@ use crate::{
 };
 
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone)]
+#[cfg_attr(not(prusti), derive(Debug))]
 pub enum ChunkCreationError {
     /// There was already a `TrustedChunk` created with an overlapping range
     Overlap(usize),
