@@ -39,47 +39,47 @@ impl StaticArray {
         self.arr[index]
     }
 
-    /// Sets the the element at `index` with the value `elem`.
-    /// 
-    /// # Pre-conditions:
-    /// * Index is less than the length
-    /// 
-    /// # Post-conditions:
-    /// * The element at `index` is equal to `elem`
-    /// * All other elements not at `index` remain unchanged
-    #[requires(0 <= index && index < self.len())]
-    #[ensures(self.arr[index] == elem)]
-    #[ensures(forall(|i: usize| ((0 <= i && i < self.arr.len()) && i != index) ==> self.arr[i] == old(self.arr[i])))]
-    pub(crate) fn set_element(&mut self, index: usize, elem: Option<RangeInclusive<usize>>) {
-        self.arr[index] = elem;
-    }
+    // /// Sets the the element at `index` with the value `elem`.
+    // /// 
+    // /// # Pre-conditions:
+    // /// * Index is less than the length
+    // /// 
+    // /// # Post-conditions:
+    // /// * The element at `index` is equal to `elem`
+    // /// * All other elements not at `index` remain unchanged
+    // #[requires(0 <= index && index < self.len())]
+    // #[ensures(self.arr[index] == elem)]
+    // #[ensures(forall(|i: usize| ((0 <= i && i < self.arr.len()) && i != index) ==> self.arr[i] == old(self.arr[i])))]
+    // pub(crate) fn set_element(&mut self, index: usize, elem: Option<RangeInclusive<usize>>) {
+    //     self.arr[index] = elem;
+    // }
 
 
-    /// Looks up an element in the array and returns its start and end value.
-    /// This has to be trusted because we access the RangeInclusive start and end values
-    /// which we've already seen leads to internal compiler errors due to generics.
-    /// 
-    /// # Pre-conditions:
-    /// * Index is less than the length
-    /// 
-    /// # Post-conditions:
-    /// * The returned values are the start and end of the RangeInclusive at `index`
-    /// * If there is no element at `index`, then None is returned
-    #[pure]
-    #[trusted]
-    #[requires(0 <= index && index < self.len())]
-    #[ensures(result.is_some() ==> 
-        self.arr[index].is_some() && 
-        *peek_option(&self.arr[index]).start() == peek_option(&result).0 && 
-        *peek_option(&self.arr[index]).end() == peek_option(&result).1
-    )]
-    #[ensures(result.is_none() ==> self.arr[index].is_none())]
-    pub fn lookup_range_bounds(&self, index: usize) -> Option<((usize, usize))> {
-        match self.arr[index] {
-            Some(val) => Some((*val.start(), *val.end())),
-            None => None
-        }
-    }
+    // /// Looks up an element in the array and returns its start and end value.
+    // /// This has to be trusted because we access the RangeInclusive start and end values
+    // /// which we've already seen leads to internal compiler errors due to generics.
+    // /// 
+    // /// # Pre-conditions:
+    // /// * Index is less than the length
+    // /// 
+    // /// # Post-conditions:
+    // /// * The returned values are the start and end of the RangeInclusive at `index`
+    // /// * If there is no element at `index`, then None is returned
+    // #[pure]
+    // #[trusted]
+    // #[requires(0 <= index && index < self.len())]
+    // #[ensures(result.is_some() ==> 
+    //     self.arr[index].is_some() && 
+    //     *peek_option(&self.arr[index]).start() == peek_option(&result).0 && 
+    //     *peek_option(&self.arr[index]).end() == peek_option(&result).1
+    // )]
+    // #[ensures(result.is_none() ==> self.arr[index].is_none())]
+    // pub fn lookup_range_bounds(&self, index: usize) -> Option<((usize, usize))> {
+    //     match self.arr[index] {
+    //         Some(val) => Some((*val.start(), *val.end())),
+    //         None => None
+    //     }
+    // }
 
 
     /// Adds an element to the array if there's space.

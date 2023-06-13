@@ -51,7 +51,6 @@ impl TrustedChunkAllocator {
     /// # Post-conditions:
     /// * If `heap_init` was set or the `list` was not empty, then an error is returned
     /// * If successful, `heap_init` is set
-    /// * If successful, then all elements of `array` are set to None
     /// * If successful, then no element in `list` overlaps
     /// 
     /// # Verification Notes:
@@ -59,7 +58,7 @@ impl TrustedChunkAllocator {
     /// but haven't figured out a loop invariant that does that.
     #[ensures((old(self.heap_init) || old(self.list.len() != 0)) ==> result.is_err())]
     #[ensures(result.is_ok() ==> self.heap_init)]
-    #[ensures(result.is_ok() ==> forall(|i: usize| (0 <= i && i < self.array.arr.len()) ==> self.array.arr[i].is_none()))]
+    // #[ensures(result.is_ok() ==> forall(|i: usize| (0 <= i && i < self.array.arr.len()) ==> self.array.arr[i].is_none()))]
     #[ensures(result.is_ok() ==> forall(|i: usize, j: usize| (0 <= i && i < self.list.len() && 0 <= j && j < self.list.len()) ==> 
         (i != j ==> !range_overlaps(&self.list.lookup(i), &self.list.lookup(j))))
     )]
@@ -74,7 +73,7 @@ impl TrustedChunkAllocator {
             //     exists(|j: usize| 0 <= j && j < self.array.len() && self.array.lookup(j).is_some() && self.list.lookup(i) == peek_option(&self.array.lookup(j)))
             // })
             // );
-            body_invariant!(forall(|j: usize| ((0 <= j && j < i) ==> self.array.arr[j].is_none())));
+            // body_invariant!(forall(|j: usize| ((0 <= j && j < i) ==> self.array.arr[j].is_none())));
             body_invariant!(forall(|i: usize, j: usize| (0 <= i && i < self.list.len() && 0 <= j && j < self.list.len()) ==> 
                 (i != j ==> !range_overlaps(&self.list.lookup(i), &self.list.lookup(j))))
             );
@@ -83,7 +82,7 @@ impl TrustedChunkAllocator {
 
             if let Some(range) = self.array.lookup(i) {
                 match self.list.push_unique_with_precond(range) {
-                    Ok(()) => self.array.set_element(i, None),
+                    Ok(()) => (),
                     Err(_) => return Err(())
                 }
             }
