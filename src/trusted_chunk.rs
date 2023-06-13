@@ -48,20 +48,33 @@ impl TrustedChunkAllocator {
     /// Shifts all elements in `array` to the heap-allocated `list`.
     /// Returns an error if the heap was already initialized and the transfer has already occured.
     /// 
+    /// # Pre-conditions:
+    /// * The `array` is ordered so that all Some(_) elements occur at the beginning of the array, followed by all None elements.
+    /// This pre-condtion is required so that we can relate each element in the old `array` with elements in the updated `list` in the post-conditions.
+    /// Since this is a public function, the  SMT solver cannot check that the pre-condition is valid, so we use the type system. 
+    /// The only exposed function to modify the array is the StaticArray::push() function which has this 
+    /// invariant as both a pre and post condition. So everytime we add an element to an array this pre-condition is upheld.
+    /// 
     /// # Post-conditions:
     /// * If `heap_init` was set or the `list` was not empty, then an error is returned
     /// * If successful, `heap_init` is set
     /// * If successful, then no element in `list` overlaps
-    /// 
-    /// # Verification Notes:
-    /// Ideally, should relate each element in the old `array` with elements in the updated `list`
-    /// but haven't figured out a loop invariant that does that.
+    /// * If successful, then the length of the list <= length of the array
+    /// * If successful, then each element in the list was originally present in the array
+    #[requires(forall(|i: usize| (0 <= i && i < self.array.len() && self.array.arr[i].is_some()) ==> {
+        forall(|j: usize| (0 <= j && j < i) ==> self.array.arr[j].is_some())
+    }))]
+    #[requires(forall(|i: usize| (0 <= i && i < self.array.len() && self.array.arr[i].is_none()) ==> {
+        forall(|j: usize| (i <= j && j < self.array.arr.len()) ==> self.array.arr[j].is_none())
+    }))]
     #[ensures((old(self.heap_init) || old(self.list.len() != 0)) ==> result.is_err())]
     #[ensures(result.is_ok() ==> self.heap_init)]
-    // #[ensures(result.is_ok() ==> forall(|i: usize| (0 <= i && i < self.array.arr.len()) ==> self.array.arr[i].is_none()))]
     #[ensures(result.is_ok() ==> forall(|i: usize, j: usize| (0 <= i && i < self.list.len() && 0 <= j && j < self.list.len()) ==> 
         (i != j ==> !range_overlaps(&self.list.lookup(i), &self.list.lookup(j))))
     )]
+    #[ensures(result.is_ok() ==> self.list.len() <= self.array.len())]
+    #[ensures(result.is_ok() ==>  forall(|i: usize| (0 <= i && i < self.list.len()) ==> peek_option(&self.array.arr[i]) == self.list.lookup(self.list.len() - 1 - i)))]
+    // #[ensures(forall(|i: usize| (self.list.len() <= i && i < self.array.arr.len()) ==> self.array.arr[i].is_none()))]
     pub fn switch_to_heap_allocated(&mut self) -> Result<(),()> {
         if self.heap_init || self.list.len() != 0 {
             return Err(());
@@ -69,11 +82,10 @@ impl TrustedChunkAllocator {
 
         let mut i = 0;
         while i < self.array.arr.len() {
-            // body_invariant!(forall(|i: usize| (0 <= i && i < self.list.len()) ==> {
-            //     exists(|j: usize| 0 <= j && j < self.array.len() && self.array.lookup(j).is_some() && self.list.lookup(i) == peek_option(&self.array.lookup(j)))
-            // })
-            // );
-            // body_invariant!(forall(|j: usize| ((0 <= j && j < i) ==> self.array.arr[j].is_none())));
+            body_invariant!(self.list.len() <= self.array.len());
+            body_invariant!(self.list.len() == i);
+            body_invariant!(forall(|j: usize| ((0 <= j && j < self.list.len()) ==> self.array.arr[j].is_some())));
+            body_invariant!(forall(|j: usize| ((0 <= j && j < self.list.len()) ==> peek_option(&self.array.arr[j]) == self.list.lookup(self.list.len() - 1 - j))));
             body_invariant!(forall(|i: usize, j: usize| (0 <= i && i < self.list.len() && 0 <= j && j < self.list.len()) ==> 
                 (i != j ==> !range_overlaps(&self.list.lookup(i), &self.list.lookup(j))))
             );
@@ -85,7 +97,10 @@ impl TrustedChunkAllocator {
                     Ok(()) => (),
                     Err(_) => return Err(())
                 }
+            } else {
+                break;
             }
+
             i += 1;
         }
         self.heap_init = true;
@@ -95,15 +110,29 @@ impl TrustedChunkAllocator {
 
     /// The only public interface to create a `TrustedChunk`.
     /// 
+    /// # Pre-conditions:
+    /// * The `array` is ordered so that all Some(_) elements occur at the beginning of the array, followed by all None elements.
+    /// This pre-condtion is required so that we can relate each element in the old `array` with elements in the updated `list` when we start using the heap.
+    /// Since this is a public function, the  SMT solver cannot check that the pre-condition is valid, so we use the type system. 
+    /// The only exposed function to modify the array is the StaticArray::push() function which has this 
+    /// invariant as both a pre and post condition. So everytime we add an element to an array this condition is upheld.
+    /// 
     /// # Post-conditions:
     /// * If ChunkCreationError::Overlap(idx) is returned, then `chunk_range` overlaps with the element at index idx
     /// * If successful, then result is equal to `chunk_range`
     /// * If successful, then `chunk_range` did not overlap with any element in the old array/ list
     /// * If successful, then `chunk_range` has been added to the array/ list
+    /// * If successful, then the `array` remains ordered with all Some elements followed by all None elements
     /// 
     /// # Verification Notes:
     /// We could bring all post-conditions from the TrustedChunk::new functions as post-conditions here
     /// but it gets extremenly verbose
+    #[requires(forall(|i: usize| (0 <= i && i < self.array.len() && self.array.arr[i].is_some()) ==> {
+        forall(|j: usize| (0 <= j && j < i) ==> self.array.arr[j].is_some())
+    }))]
+    #[requires(forall(|i: usize| (0 <= i && i < self.array.len() && self.array.arr[i].is_none()) ==> {
+        forall(|j: usize| (i <= j && j < self.array.arr.len()) ==> self.array.arr[j].is_none())
+    }))]
     #[ensures(result.is_err() ==> {
         match peek_err(&result) {
             ChunkCreationError::Overlap(idx) => {
@@ -131,6 +160,13 @@ impl TrustedChunkAllocator {
             idx < self.array.len() && self.array.lookup(idx).is_some() && peek_option(&self.array.lookup(idx)) == chunk_range
         })
     })]
+
+    #[ensures(forall(|i: usize| (0 <= i && i < self.array.len() && self.array.arr[i].is_some()) ==> {
+        forall(|j: usize| (0 <= j && j < i) ==> self.array.arr[j].is_some())
+    }))]
+    #[ensures(forall(|i: usize| (0 <= i && i < self.array.len() && self.array.arr[i].is_none()) ==> {
+        forall(|j: usize| (i <= j && j < self.array.arr.len()) ==> self.array.arr[j].is_none())
+    }))]
     pub fn create_chunk(&mut self, chunk_range: RangeInclusive<usize>) -> Result<(TrustedChunk, usize), ChunkCreationError> {
         if self.heap_init {
             match TrustedChunk::new(chunk_range, &mut self.list) { // can't use map because Prusti can't reason about the return value then
@@ -235,12 +271,22 @@ impl TrustedChunk {
     /// Returns an Err if there is an overlap, with the error value being the index in `chunk_list` of the element which overlaps with `frames`.
     /// Also returns an error if the `chunk_list` is full and no new element can be added.
     /// 
+    ///  # Pre-conditions:
+    /// * The `chunk_list` is ordered so that all Some(_) elements occur at the beginning of the array, followed by all None elements.
+    ///
     /// # Post-conditions:
     /// * If it fails than there was an overlap with an existing chunk, there's no more room in the array or an empty range was passed as an argument
     /// * If it succeeds, then the newly created chunk has the same bounds as `chunk_range`
     /// * If it succeeds, then `chunk_range` is added to the list
     /// * If it succeeds, then all other elements in the `chunk_list` remain unchanged
     /// * If it succeeds, then `chunk_range` did not overlap with any element in the old `chunk_list`
+    /// * If successful, then the `chunk_list` remains ordered with all Some elements followed by all None elements
+    #[requires(forall(|i: usize| (0 <= i && i < chunk_list.arr.len() && chunk_list.arr[i].is_some()) ==> {
+        forall(|j: usize| (0 <= j && j < i) ==> chunk_list.arr[j].is_some())
+    }))]
+    #[requires(forall(|i: usize| (0 <= i && i < chunk_list.arr.len() && chunk_list.arr[i].is_none()) ==> {
+        forall(|j: usize| (i <= j && j < chunk_list.arr.len()) ==> chunk_list.arr[j].is_none())
+    }))]
     #[ensures(result.is_err() ==> {
         match peek_err(&result) {
             ChunkCreationError::Overlap(idx) => (idx < chunk_list.len()) && (chunk_list.lookup(idx).is_some()) && range_overlaps(&peek_option(&chunk_list.lookup(idx)), &chunk_range),
@@ -262,6 +308,12 @@ impl TrustedChunk {
         forall(|i: usize| ((0 <= i && i < chunk_list.len()) ) && old(chunk_list.lookup(i)).is_some()
             ==> !range_overlaps(&peek_option(&old(chunk_list.lookup(i))), &chunk_range))
     )] 
+    #[ensures(forall(|i: usize| (0 <= i && i < chunk_list.arr.len() && chunk_list.arr[i].is_some()) ==> {
+        forall(|j: usize| (0 <= j && j < i) ==> chunk_list.arr[j].is_some())
+    }))]
+    #[ensures(forall(|i: usize| (0 <= i && i < chunk_list.arr.len() && chunk_list.arr[i].is_none()) ==> {
+        forall(|j: usize| (i <= j && j < chunk_list.arr.len()) ==> chunk_list.arr[j].is_none())
+    }))]
     fn new_pre_heap(chunk_range: RangeInclusive<usize>, chunk_list: &mut StaticArray) -> Result<(TrustedChunk, usize), ChunkCreationError> {
         if chunk_range.is_empty() {
             return Err(ChunkCreationError::InvalidRange);

@@ -12,7 +12,7 @@ use crate::{
 use core::mem;
 
 pub struct StaticArray  {
-    pub(crate) arr: [Option<RangeInclusive<usize>>; 64]
+    pub(crate) arr: [Option<RangeInclusive<usize>>; 64] // only public so it can be used in spec
 }
 
 impl StaticArray {
@@ -84,12 +84,22 @@ impl StaticArray {
 
     /// Adds an element to the array if there's space.
     /// 
+    /// # Pre-conditions:
+    /// * The array is ordered so that all Some(_) elements occur at the beginning of the array, followed by all None elements.
+    ///
     /// # Post-conditions:
     /// * If the push fails, then all elements remain unchanged
     /// * If the push fails, then all elements were Some(_)
     /// * If the push succeeds, then the element at the returned index is now Some(_)
     /// * If the push succeeds, then the element at the returned index is equal to `value`
     /// * If the push succeeds, then all the elements are unchanged except at the returned index 
+    /// * If successful, then the array remains ordered with all Some elements followed by all None elements
+    #[requires(forall(|i: usize| (0 <= i && i < self.arr.len() && self.arr[i].is_some()) ==> {
+        forall(|j: usize| (0 <= j && j < i) ==> self.arr[j].is_some())
+    }))]
+    #[requires(forall(|i: usize| (0 <= i && i < self.arr.len() && self.arr[i].is_none()) ==> {
+        forall(|j: usize| (i <= j && j < self.arr.len()) ==> self.arr[j].is_none())
+    }))]
     #[ensures(result.is_err() ==> 
         forall(|i: usize| (0 <= i && i < self.arr.len()) ==> old(self.arr[i]) == self.arr[i])
     )]
@@ -108,6 +118,12 @@ impl StaticArray {
     #[ensures(result.is_ok() ==> 
         forall(|i: usize| ((0 <= i && i < self.arr.len()) && (i != peek_result(&result))) ==> old(self.arr[i]) == self.arr[i])
     )] 
+    #[ensures(forall(|i: usize| (0 <= i && i < self.arr.len() && self.arr[i].is_some()) ==> {
+        forall(|j: usize| (0 <= j && j < i) ==> self.arr[j].is_some())
+    }))]
+    #[ensures(forall(|i: usize| (0 <= i && i < self.arr.len() && self.arr[i].is_none()) ==> {
+        forall(|j: usize| (i <= j && j < self.arr.len()) ==> self.arr[j].is_none())
+    }))]
 	pub(crate) fn push(&mut self, value: RangeInclusive<usize>) -> Result<usize,()> {
         let mut i = 0;
 
