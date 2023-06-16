@@ -213,6 +213,7 @@ impl List {
     /// * if the result is Some(idx), then idx is less than the list's length.
     /// * if the result is Some(idx), then the element at idx overlaps with `elem`
     /// * if the result is None, then no element in the lists overlaps with `elem`
+    #[pure]
     #[requires(0 <= index && index <= self.len())]
     #[ensures(result.is_some() ==> peek_option(&result) < self.len())]
     #[ensures(result.is_some() ==> {
@@ -238,6 +239,81 @@ impl List {
         };
         ret
     }
+
+    // #[ensures(self.elem_overlaps_in_list(elem, index) == Self::elem_overlaps_in_list_all(&self.head, elem, index) )]
+    pub(crate) fn elem_overlaps(&self, elem: RangeInclusive<usize>, index: usize) -> Option<usize> {
+        Self::elem_overlaps_in_list_all(&self.head, elem, index)
+    }
+
+    // #[ensures(result.is_some() ==> {
+    //     let idx = peek_option(&result);
+    //     if idx == index {
+    //         head.len() > 1
+    //     } else {
+    //         true
+    //     }
+    // })]
+    // #[ensures(result.is_some() ==> {
+    //     let idx = peek_option(&result);
+    //     if idx == index {
+    //         let range = head.lookup(0);
+    //         range_overlaps(&range, &elem)
+    //     } else {
+    //         true
+    //     }
+    // })]
+    #[pure]
+    pub(crate) fn elem_overlaps_in_list_all(head: &Link, elem: RangeInclusive<usize>, index: usize) -> Option<usize> {
+        match head {
+            Link::Empty => None,
+            Link::More(box node) => {
+                if range_overlaps(&head.lookup(0), &elem) {return Some(index);}
+                else {
+                    Self::elem_overlaps_in_list_all(&node.next, elem, index + 1)
+                }
+            }
+        }
+    }
+
+    // #[requires(0 <= index && index <= self.len())]
+    // #[ensures(result.is_some() ==> peek_option(&result) < self.len())]
+    // #[ensures(result.is_some() ==> {
+    //         let idx = peek_option(&result);
+    //         let range = self.lookup(idx);
+    //         range_overlaps(&range, &elem)
+    //     }
+    // )]
+    // #[ensures(result.is_none() ==> 
+    //     forall(|i: usize| (index <= i && i < self.len()) ==> {
+    //         let range = self.lookup(i);
+    //         !range_overlaps(&range, &elem)
+    //     })
+    // )]
+    // pub(crate) fn elem_overlaps_in_list_loop(&self, elem: RangeInclusive<usize>) -> bool {
+    //     let mut current = &self.head;
+    //     let len = self.len();
+
+    //     let mut i = 0;
+        
+    //     let mut overlap = false;
+    //     while i < len {
+    //         body_invariant!(i < len);
+    //         match current {
+    //             Link::Empty => (),
+    //             Link::More(box node) => {
+    //                 // if range_overlaps(&node.elem, &elem) {
+    //                 //     overlap = true;
+    //                 // } else {
+    //                     current = &node.next; // *** This line causes a prusti panic
+    //                 // }
+    //                 ()
+    //             }
+    //         }
+    //         i += 1;
+    //     }
+    //     overlap
+    // }
+
 
 }
 
@@ -284,5 +360,30 @@ impl Link {
             }
         }
     }
+
+    // // #[pure]
+    // #[requires(0 <= index && index < self.len())]
+    // pub fn lookup_iterative(&self, index: usize) -> Option<usize> {
+    //     let mut current = 0;
+    //     let len = self.len();
+    //     let mut link = self;
+
+    //     while current < len {
+    //         body_invariant!(true);
+    //         body_invariant!(current < len);
+    //         match link {
+    //             Link::Empty => (),
+    //             Link::More(box node) => {
+    //                 if current == index {
+    //                     // let elem = node.elem;
+    //                     return Some(current);
+    //                 }
+    //                 link = &node.next;
+    //             }
+    //         }
+    //         current += 1;
+    //     }
+    //     None
+    // }
 
 }
