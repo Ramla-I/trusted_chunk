@@ -19,9 +19,9 @@ use crate::external_spec::trusted_option::*;
 /// # Pre-conditions:
 /// * chunks are not empty
 #[pure]
-// #[requires(chunk1.is_some() ==> !peek_option_ref(&chunk1).is_empty())]
-// #[requires(!chunk2.is_empty())]
-// #[requires(chunk3.is_some() ==> !peek_option_ref(&chunk3).is_empty())]
+#[requires(chunk1.is_some() ==> !peek_option_ref(&chunk1).is_empty())]
+#[requires(!chunk2.is_empty())]
+#[requires(chunk3.is_some() ==> !peek_option_ref(&chunk3).is_empty())]
 pub(crate) fn split_chunk_has_no_overlapping_ranges(chunk1: &Option<FrameRange>, chunk2: &FrameRange, chunk3: &Option<FrameRange>) -> bool {
     let mut no_overlap = true;
 
@@ -40,57 +40,57 @@ pub(crate) fn split_chunk_has_no_overlapping_ranges(chunk1: &Option<FrameRange>,
     no_overlap
 }
 
-/// Returns true if the start and end of the original chunk is equal to the extreme bounds of the split chunk.
-/// 
-/// # Pre-conditions:
-/// * chunks are not empty
-#[pure]
+// /// Returns true if the start and end of the original chunk is equal to the extreme bounds of the split chunk.
+// /// 
+// /// # Pre-conditions:
+// /// * chunks are not empty
+// #[pure]
 // #[requires(!orig_chunk.is_empty())]
 // #[requires(split_chunk.0.is_some() ==> !peek_option_ref(&split_chunk.0).is_empty())]
 // #[requires(!split_chunk.1.is_empty())]
 // #[requires(split_chunk.2.is_some() ==> !peek_option_ref(&split_chunk.2).is_empty())]
-pub(crate) fn split_chunk_has_same_range(orig_chunk: &FrameRange, split_chunk: &(Option<FrameRange>, FrameRange, Option<FrameRange>)) -> bool {
-    let (chunk1,chunk2,chunk3) = split_chunk;
-    let min_page;
-    let max_page;
+// pub(crate) fn split_chunk_has_same_range(orig_chunk: &FrameRange, split_chunk: &(Option<FrameRange>, FrameRange, Option<FrameRange>)) -> bool {
+//     let (chunk1,chunk2,chunk3) = split_chunk;
+//     let min_page;
+//     let max_page;
 
-    if let Some(c1) = chunk1 {
-        min_page = c1.start();    
-    } else {
-        min_page = chunk2.start();
-    }
+//     if let Some(c1) = chunk1 {
+//         min_page = c1.start();    
+//     } else {
+//         min_page = chunk2.start();
+//     }
 
-    if let Some(c3) = chunk3 {
-        max_page = c3.end();    
-    } else {
-        max_page = chunk2.end();
-    }
+//     if let Some(c3) = chunk3 {
+//         max_page = c3.end();    
+//     } else {
+//         max_page = chunk2.end();
+//     }
 
-    min_page == orig_chunk.start() && max_page == orig_chunk.end()
-}
+//     min_page == orig_chunk.start() && max_page == orig_chunk.end()
+// }
 
 
-/// Returns true if `chunk1`, `chunk2` and `chunk3` are contiguous.
-/// 
-/// # Pre-conditions:
-/// * chunks are not empty
-#[pure]
+// /// Returns true if `chunk1`, `chunk2` and `chunk3` are contiguous.
+// /// 
+// /// # Pre-conditions:
+// /// * chunks are not empty
+// #[pure]
 // #[requires(end_frame_is_less_than_max_or_none(chunk1))] //only required if CHECK_OVERFLOWS flag is enabled
 // #[requires(end_frame_is_less_than_max(chunk2))] //only required if CHECK_OVERFLOWS flag is enabled
 // #[requires(end_frame_is_less_than_max_or_none(chunk3))] //only required if CHECK_OVERFLOWS flag is enabled
 // #[requires(chunk1.is_some() ==> peek_option_ref(&chunk1).start().number() <= peek_option_ref(&chunk1).end().number())]
 // #[requires(chunk2.start().number() <= chunk2.end().number())]
 // #[requires(chunk3.is_some() ==> peek_option_ref(&chunk3).start().number() <= peek_option_ref(&chunk3).end().number())]
-pub(crate) fn split_chunk_is_contiguous(chunk1: &Option<FrameRange>, chunk2: &FrameRange, chunk3: &Option<FrameRange>) -> bool {
-    let mut contiguous = true;
-    if let Some(c1) = chunk1 {
-        contiguous &= c1.end().number() + 1 == chunk2.start().number()
-    } 
-    if let Some(c3) = chunk3 {
-        contiguous &= chunk2.end().number() + 1 == c3.start().number()
-    }
-    contiguous
-}
+// pub(crate) fn split_chunk_is_contiguous(chunk1: &Option<FrameRange>, chunk2: &FrameRange, chunk3: &Option<FrameRange>) -> bool {
+//     let mut contiguous = true;
+//     if let Some(c1) = chunk1 {
+//         contiguous &= c1.end().number() + 1 == chunk2.start().number()
+//     } 
+//     if let Some(c3) = chunk3 {
+//         contiguous &= chunk2.end().number() + 1 == c3.start().number()
+//     }
+//     contiguous
+// }
 
 
 // /*** Constants taken from kernel_config crate. Only required if CHECK_OVERFLOWS flag is enabled. ***/ 

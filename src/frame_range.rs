@@ -10,7 +10,7 @@ use core::cmp::{PartialOrd, Ord, Ordering};
 use crate::{
     *,
     external_spec::{trusted_option::*, trusted_result::*},
-    spec::{range_overlaps::range_overlaps},
+    spec::{framerange_spec::*},
 };
 
 pub const MAX_VIRTUAL_ADDRESS: usize = usize::MAX;
@@ -42,7 +42,7 @@ fn max(a: usize, b: usize) -> usize {
 // #[ensures(b < a ==> result == b)]
 // #[ensures(a == b ==> result == a)]
 fn min_frame(a: Frame, b: Frame) -> Frame {
-    if a < b { a } else { b }
+    if a.less_than(&b) { a } else { b }
 }
 
 #[pure]
@@ -51,7 +51,7 @@ fn min_frame(a: Frame, b: Frame) -> Frame {
 // #[ensures(b > a ==> result == b)]
 // #[ensures(a == b ==> result == a)]
 fn max_frame(a: Frame, b: Frame) -> Frame {
-    if a > b { a } else { b }
+    if a.greater_than(&b) { a } else { b }
 }
 
 #[pure]
@@ -124,6 +124,25 @@ impl PartialOrd for Frame {
     // fn ge(&self, other: &Self) -> bool;
 }
 
+impl Add<usize> for Frame {
+    type Output = Frame;
+    fn add(self, rhs: usize) -> Frame {
+        // cannot exceed max page number (which is also max frame number)
+        Frame {
+            number: min(MAX_PAGE_NUMBER, self.number.saturating_add(rhs)),
+        }
+    }
+}
+
+impl Sub<usize> for Frame {
+    type Output = Frame;
+    fn sub(self, rhs: usize) -> Frame {
+        Frame {
+            number: self.number.saturating_sub(rhs),
+        }
+    }
+}
+
 impl Frame {
     #[pure]
     pub const fn number(&self) -> usize {
@@ -133,35 +152,53 @@ impl Frame {
     #[pure]
     #[trusted]
     #[ensures(result.number == min(MAX_PAGE_NUMBER, saturating_add(self.number, rhs)))]
-    pub fn add(self, rhs: usize) -> Self {
+    pub fn plus(self, rhs: usize) -> Self {
         self + rhs
     }
 
     #[pure]
     #[trusted]
     #[ensures(result.number == saturating_sub(self.number, rhs))]
-    pub fn sub(self, rhs: usize) -> Self {
+    pub fn minus(self, rhs: usize) -> Self {
         self - rhs
     }
-}
 
-
-impl Add<usize> for Frame {
-    type Output = Frame;
     #[pure]
-    fn add(self, rhs: usize) -> Frame {
-        // cannot exceed max page number (which is also max frame number)
-        Frame{ number: min(MAX_PAGE_NUMBER, saturating_add(self.number, rhs)) }
+    #[trusted]
+    #[ensures(result == (self.number < rhs.number))]
+    #[ensures(!result ==> self.greater_than_equal(&rhs))]
+    pub fn less_than(self, rhs: &Self) -> bool {
+        self < *rhs
     }
+
+    #[pure]
+    #[trusted]
+    #[ensures(result == (self.number <= rhs.number))]
+    #[ensures(!result ==> self.greater_than(&rhs))]
+    pub fn less_than_equal(self, rhs: &Self) -> bool {
+        self <= *rhs
+    }
+
+    #[pure]
+    #[trusted]
+    #[ensures(result == (self.number > rhs.number))]
+    #[ensures(!result ==> self.less_than_equal(&rhs))]
+    pub fn greater_than(self, rhs: &Self) -> bool {
+        self > *rhs
+    }
+
+    #[pure]
+    #[trusted]
+    #[ensures(result == (self.number >= rhs.number))]
+    #[ensures(!result ==> self.less_than(&rhs))]
+    pub fn greater_than_equal(self, rhs: &Self) -> bool {
+        self >= *rhs
+    }
+
+
 }
 
-impl Sub<usize> for Frame {
-    type Output = Frame;
-    #[pure]
-    fn sub(self, rhs: usize) -> Frame {
-        Frame{ number: saturating_sub(self.number, rhs) }
-    }
-}
+
 
 /// A struct representing an unallocated region in memory.
 /// Its functions are formally verified to prevent range overlaps between chunks.
@@ -200,9 +237,10 @@ impl FrameRange {
     }
 
     #[pure]
-    #[ensures(result ==> self.end() < self.start())]
+    #[ensures(result == (self.start().greater_than(&self.end())))]
+    #[ensures(result == !(self.start().less_than_equal(&self.end())))]
     pub fn is_empty(&self) -> bool {
-        !(self.start().number <= self.end().number)
+        !(self.start().less_than_equal(&self.end()))
     }
 
     #[pure]
@@ -212,7 +250,7 @@ impl FrameRange {
     pub fn overlap(&self, other: &FrameRange) -> bool {
         let starts = max_frame(self.start(), other.start());
         let ends   = min_frame(self.end(), other.end());
-        if starts <= ends {
+        if starts.less_than_equal(&ends) {
             true
         } else {
             false
@@ -221,54 +259,57 @@ impl FrameRange {
 
 
 
-    // /// Splits a chunk into 1-3 chunks, depending on where the split is at.
-    // /// It is formally verified that the resulting chunks are disjoint, contiguous and their start/end is equal to that of the original chunk.
-    // /// 
-    // /// # Post-conditions:
-    // /// * If it succeeds, then the resulting chunks have no overlapping ranges
-    // /// * If it succeeds, then the resulting chunks are contiguous
-    // /// * If it succeeds, then the resulting chunks combined have the same range as `self`
-    // /// * If it fails, then the original chunk is returned
+    /// Splits a chunk into 1-3 chunks, depending on where the split is at.
+    /// It is formally verified that the resulting chunks are disjoint, contiguous and their start/end is equal to that of the original chunk.
+    /// 
+    /// # Post-conditions:
+    /// * If it succeeds, then the resulting chunks have no overlapping ranges
+    /// * If it succeeds, then the resulting chunks are contiguous
+    /// * If it succeeds, then the resulting chunks combined have the same range as `self`
+    /// * If it fails, then the original chunk is returned
+    #[ensures(result.is_ok() ==> {
+        let split_chunk = peek_result_ref(&result);
+        split_chunk_has_no_overlapping_ranges(&split_chunk.0, &split_chunk.1, &split_chunk.2)
+    })]
     // #[ensures(result.is_ok() ==> {
     //     let split_chunk = peek_result_ref(&result);
-    //     split_chunk_has_no_overlapping_ranges(&split_chunk.0, &split_chunk.1, &split_chunk.2)
+    //     split_chunk_is_contiguous(&split_chunk.0, &split_chunk.1, &split_chunk.2)
     // })]
-    // // #[ensures(result.is_ok() ==> {
-    // //     let split_chunk = peek_result_ref(&result);
-    // //     split_chunk_is_contiguous(&split_chunk.0, &split_chunk.1, &split_chunk.2)
-    // // })]
-    // // #[ensures(result.is_ok() ==> split_chunk_has_same_range(&self, peek_result_ref(&result)))]
-    // // #[ensures(result.is_err() ==> {
-    // //     let orig_chunk = peek_err_ref(&result);
-    // //     (orig_chunk.start() == self.start()) && (orig_chunk.end() == self.end())
-    // // })]
-    // pub fn split(self, start_frame: Frame, num_frames: usize) -> Result<(Option<FrameRange>, FrameRange, Option<FrameRange>), FrameRange> {
-    //     if (start_frame < self.start()) || (start_frame + num_frames -1 > self.end()) || (num_frames <= 0) {
-    //         return Err(self);
-    //     }
+    // #[ensures(result.is_ok() ==> split_chunk_has_same_range(&self, peek_result_ref(&result)))]
+    // #[ensures(result.is_err() ==> {
+    //     let orig_chunk = peek_err_ref(&result);
+    //     (orig_chunk.start() == self.start()) && (orig_chunk.end() == self.end())
+    // })]
+    pub fn split(self, start_frame: Frame, num_frames: usize) -> Result<(Option<FrameRange>, FrameRange, Option<FrameRange>), FrameRange> {
+        if (start_frame.less_than(&self.start())) 
+        || (num_frames >0 && ((start_frame.plus(num_frames -1)).greater_than(&self.end()))) 
+        || (num_frames <= 0) {
+            return Err(self);
+        }
 
-    //     let first_chunk = if start_frame == self.start() {
-    //         None
-    //     } else {
-    //         // prusti_assert!(start_frame > self.start());
-    //         Some(FrameRange::new(self.start(), start_frame - 1))
-    //     };
+        let first_chunk = if start_frame == self.start() {
+            None
+        } else {
+            prusti_assert!(start_frame.greater_than(&self.start()));
+            prusti_assert!(start_frame.minus(1).greater_than_equal(&self.start()));
+            Some(FrameRange::new(self.start(), start_frame.minus(1)))
+        };
 
-    //     prusti_assert!(start_frame.number() + num_frames - 1 >= start_frame.number()); 
-    //     // prusti_assert!((start_frame + num_frames - 1).number() >= start_frame.number()); // fails
-    //     prusti_assert!(num_frames > 0);
+        // prusti_assert!(start_frame.number() + num_frames - 1 >= start_frame.number()); 
+        // prusti_assert!((start_frame + num_frames - 1).number() >= start_frame.number()); // fails
+        prusti_assert!(num_frames > 0);
 
-    //     let second_chunk = FrameRange::new(start_frame, start_frame + num_frames - 1);
+        let second_chunk = FrameRange::new(start_frame, start_frame.plus(num_frames - 1));
 
-    //     let third_chunk = if start_frame + num_frames - 1 == self.end() {
-    //         None
-    //     } else {
-    //         // prusti_assert!(self.end() >= start_frame + num_frames);
-    //         Some(FrameRange::new(start_frame + num_frames, self.end())) 
-    //     };
+        let third_chunk = if start_frame.plus(num_frames - 1) == self.end() {
+            None
+        } else {
+            // prusti_assert!(self.end() >= start_frame + num_frames);
+            Some(FrameRange::new(start_frame.plus(num_frames), self.end())) 
+        };
 
-    //     Ok((first_chunk, second_chunk, third_chunk))
-    // }
+        Ok((first_chunk, second_chunk, third_chunk))
+    }
 
 
     // /// Splits a chunk into 2 chunks at the frame with number `at_frame`.
