@@ -152,6 +152,7 @@ impl Frame {
     #[pure]
     #[trusted]
     #[ensures(result.number == min(MAX_PAGE_NUMBER, saturating_add(self.number, rhs)))]
+    #[ensures(result.greater_than_equal(&self))]
     pub fn plus(self, rhs: usize) -> Self {
         self + rhs
     }
@@ -298,6 +299,7 @@ impl FrameRange {
         // prusti_assert!(start_frame.number() + num_frames - 1 >= start_frame.number()); 
         // prusti_assert!((start_frame + num_frames - 1).number() >= start_frame.number()); // fails
         prusti_assert!(num_frames > 0);
+        prusti_assert!(start_frame.plus(num_frames - 1).greater_than_equal(&start_frame));
 
         let second_chunk = FrameRange::new(start_frame, start_frame.plus(num_frames - 1));
 
