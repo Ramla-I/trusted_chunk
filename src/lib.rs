@@ -17,6 +17,7 @@ pub mod static_array;
 // pub mod trusted_chunk;
 // mod test;
 mod frames;
+mod pages;
 
 cfg_if::cfg_if! {
 if #[cfg(prusti)] {
