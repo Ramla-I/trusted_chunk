@@ -5,6 +5,7 @@ use crate::external_spec::trusted_range_inclusive::*;
 #[cfg(not(prusti))]
 use range_inclusive::*;
 
+use core::char::MAX;
 use core::ops::{Deref, DerefMut, Add, Sub};
 use core::cmp::{PartialOrd, Ord, Ordering};
 use crate::{
@@ -273,9 +274,15 @@ impl FrameRange {
         }
     }
 
+    #[pure]
+    pub fn contains_range(&self, other: &FrameRange) -> bool {
+        !other.is_empty()
+        && (other.start_frame().greater_than_equal(&self.start_frame()))
+        && (other.end_frame().less_than_equal(&self.end_frame()))
+    }
 
 
-    /// Splits a chunk into 1-3 chunks, depending on where the split is at.
+    /// Splits a range into 1-3 ranges, depending on where the split is at.
     /// It is formally verified that the resulting chunks are disjoint, contiguous and their start/end is equal to that of the original chunk.
     /// 
     /// # Post-conditions:
@@ -284,122 +291,119 @@ impl FrameRange {
     /// * If it succeeds, then the resulting chunks combined have the same range as `self`
     /// * If it fails, then the original chunk is returned
     #[ensures(result.is_ok() ==> {
-        let split_chunk = peek_result_ref(&result);
-        ((split_chunk.0).is_some() ==> !peek_option_ref(&split_chunk.0).overlap(&split_chunk.1)) 
-        &&
-        ((split_chunk.2).is_some() ==> !split_chunk.1.overlap(peek_option_ref(&split_chunk.2)))
-        &&
-        ((split_chunk.2).is_some() ==> !split_chunk.1.overlap_numbers(peek_option_ref(&split_chunk.2)))
-
-        && (((split_chunk.0).is_some() && (split_chunk.2).is_some()) ==> !peek_option_ref(&split_chunk.0).overlap(peek_option_ref(&split_chunk.2)))
-        // split_chunk_has_no_overlapping_ranges(&split_chunk.0, &split_chunk.1, &split_chunk.2)
+        let split_range = peek_result_ref(&result);
+        ((split_range.0).is_some() ==> !peek_option_ref(&split_range.0).overlap(&split_range.1)) 
+        && ((split_range.2).is_some() ==> !split_range.1.overlap(peek_option_ref(&split_range.2)))
+        && (((split_range.0).is_some() && (split_range.2).is_some()) ==> !peek_option_ref(&split_range.0).overlap(peek_option_ref(&split_range.2)))
     })]
-    // #[ensures(result.is_ok() ==> {
-    //     let split_chunk = peek_result_ref(&result);
-    //     split_chunk_is_contiguous(&split_chunk.0, &split_chunk.1, &split_chunk.2)
-    // })]
-    // #[ensures(result.is_ok() ==> split_chunk_has_same_range(&self, peek_result_ref(&result)))]
-    // #[ensures(result.is_err() ==> {
-    //     let orig_chunk = peek_err_ref(&result);
-    //     (orig_chunk.start_frame() == self.start_frame()) && (orig_chunk.end_frame() == self.end_frame())
-    // })]
-    pub fn split(self, start_frame: Frame, num_frames: usize) -> Result<(Option<FrameRange>, FrameRange, Option<FrameRange>), FrameRange> {
-        if (start_frame.less_than(&self.start_frame())) 
-        || (num_frames > 0 && ((start_frame.plus(num_frames -1)).greater_than(&self.end_frame()))) 
-        || (num_frames <= 0) {
+    #[ensures(result.is_ok() ==> {
+        let split_range = peek_result_ref(&result);
+        ((split_range.0).is_some() ==> peek_option_ref(&split_range.0).end_frame() == split_range.1.start_frame().minus(1))
+        && ((split_range.2).is_some() ==> peek_option_ref(&split_range.2).start_frame() == split_range.1.end_frame().plus(1))
+    })]
+    #[ensures(result.is_ok() ==> {
+        let split_range = peek_result_ref(&result);
+        ((split_range.0).is_some() ==> peek_option_ref(&split_range.0).start_frame() == self.start_frame())
+        && ((split_range.0).is_none() ==> (split_range.1.start_frame() == self.start_frame() || (split_range.1.start_frame().number == MIN_FRAME_NUMBER)))
+        && ((split_range.2).is_some() ==> peek_option_ref(&split_range.2).end_frame() == self.end_frame())
+        && ((split_range.2).is_none() ==> ((split_range.1.end_frame() == self.end_frame()) || (split_range.1.end_frame().number == MAX_FRAME_NUMBER)))
+    })]
+    #[ensures(result.is_err() ==> {
+        let orig_range = peek_err_ref(&result);
+        (orig_range.start_frame() == self.start_frame()) && (orig_range.end_frame() == self.end_frame())
+    })]
+    pub fn split_range(self, frames_to_extract: FrameRange) -> Result<(Option<FrameRange>, FrameRange, Option<FrameRange>), FrameRange> {
+        let min_frame = Frame { number: MIN_FRAME_NUMBER };
+        let max_frame = Frame { number: MAX_FRAME_NUMBER };
+
+        if !self.contains_range(&frames_to_extract) {
             return Err(self);
         }
 
-        let min_frame = Frame { number: 0 };
-        let max_frame = Frame { number: 0xFF_FFFF_FFFF };
-        let first_chunk = if start_frame == min_frame || start_frame == self.start_frame() {
+        let start_frame = frames_to_extract.start_frame();
+        let end_frame = frames_to_extract.end_frame();
+
+        let before_start = if start_frame == min_frame || start_frame == self.start_frame() {
             None
         } else {
-            prusti_assert!(start_frame.greater_than(&self.start_frame()));
-            prusti_assert!(start_frame.minus(1).greater_than_equal(&self.start_frame()));
             Some(FrameRange::new(self.start_frame(), start_frame.minus(1)))
         };
 
-        // prusti_assert!(start_frame.number() + num_frames - 1 >= start_frame.number()); 
-        // prusti_assert!((start_frame + num_frames - 1).number() >= start_frame.number()); // fails
-        prusti_assert!(num_frames > 0);
-        prusti_assert!(start_frame.plus(num_frames - 1).greater_than_equal(&start_frame));
+        let start_to_end = frames_to_extract;
 
-        let second_chunk = FrameRange::new(start_frame, start_frame.plus(num_frames - 1));
-
-        let third_chunk = if start_frame.plus(num_frames - 1) == max_frame || start_frame.plus(num_frames - 1) == self.end_frame() {
+        let after_end = if frames_to_extract.end_frame() == max_frame || frames_to_extract.end_frame() == self.end_frame() {
             None
         } else {
-            prusti_assert!(num_frames > (num_frames - 1));
-            prusti_assert!(start_frame.plus(num_frames).greater_than(&start_frame.plus(num_frames - 1)));
-            // prusti_assert!(start_frame.plus(num_frames - 1).less_than(&start_frame.plus(num_frames)));
-            // prusti_assert!(self.end_frame().greater_than_equal(&start_frame.plus(num_frames)));
-            Some(FrameRange::new(start_frame.plus(num_frames), self.end_frame())) 
+            Some(FrameRange::new(end_frame.plus(1), self.end_frame())) 
         };
 
-        Ok((first_chunk, second_chunk, third_chunk))
+        Ok((before_start, start_to_end, after_end))
     }
 
 
-    // /// Splits a chunk into 2 chunks at the frame with number `at_frame`.
-    // /// It is formally verified that the resulting chunks are disjoint, contiguous and their start/end is equal to that of the original chunk.
-    // /// 
-    // /// # Post-conditions:
-    // /// * If it succeeds, then both chunks can't be empty
-    // /// * If it succeeds and the first chunk is empty, then the second chunk is equal to `self`
-    // /// * If it succeeds and the second chunk is empty, then the first chunk is equal to `self`
-    // /// * If it succeeds and both chunks aren't empty, then the chunks are contiguous and their combined range is equal to the range of `self`
-    // /// * If it fails, then the original chunk is returned
-    // #[ensures(result.is_ok() ==> {
-    //     let split_chunk = peek_result_ref(&result);
-    //     split_chunk.0.is_empty() && !split_chunk.1.is_empty() ||
-    //     !split_chunk.0.is_empty() && split_chunk.1.is_empty() ||
-    //     !split_chunk.0.is_empty() && !split_chunk.1.is_empty()
-    // })]
-    // #[ensures(result.is_ok() ==> {
-    //     let split_chunk = peek_result_ref(&result);
-    //     split_chunk.0.is_empty() ==> (split_chunk.1.start_frame() == old(self.start_frame()) && split_chunk.1.end_frame() == old(self.end_frame()))
-    // })]
-    // #[ensures(result.is_ok() ==> {
-    //     let split_chunk = peek_result_ref(&result);
-    //     split_chunk.1.is_empty() ==> (split_chunk.0.start_frame() == old(self.start_frame()) && split_chunk.0.end_frame() == old(self.end_frame()))
-    // })]
-    // #[ensures(result.is_ok() ==> {
-    //     let split_chunk = peek_result_ref(&result);
-    //     (!split_chunk.0.is_empty() && !split_chunk.1.is_empty()) ==> {
-    //         split_chunk.0.start_frame() == old(self.start_frame()) && split_chunk.0.end_frame() == at_frame - 1 &&
-    //         split_chunk.1.start_frame() == at_frame && split_chunk.1.end_frame() == old(self.end_frame())
-    //     }
-    // })]
-    // #[ensures(result.is_err() ==> {
-    //     let orig_chunk = peek_err_ref(&result);
-    //     (orig_chunk.start_frame() == self.start_frame()) && (orig_chunk.end_frame() == self.end_frame())
-    // })]
-    // pub fn split_at(mut self, at_frame: usize) -> Result<(TrustedChunk, TrustedChunk), TrustedChunk> {
-    //    let end_of_first = at_frame - 1;
+    /// Splits a chunk into 2 chunks at the frame with number `at_frame`.
+    /// It is formally verified that the resulting chunks are disjoint, contiguous and their start/end is equal to that of the original chunk.
+    /// 
+    /// # Post-conditions:
+    /// * If it succeeds, then both chunks can't be empty
+    /// * If it succeeds and the first chunk is empty, then the second chunk is equal to `self`
+    /// * If it succeeds and the second chunk is empty, then the first chunk is equal to `self`
+    /// * If it succeeds and both chunks aren't empty, then the chunks are contiguous and their combined range is equal to the range of `self`
+    /// * If it fails, then the original chunk is returned
+    #[ensures(result.is_ok() ==> {
+        let split_range = peek_result_ref(&result);
+        split_range.0.is_empty() && !split_range.1.is_empty() ||
+        !split_range.0.is_empty() && split_range.1.is_empty() ||
+        !split_range.0.is_empty() && !split_range.1.is_empty()
+    })]
+    #[ensures(result.is_ok() ==> {
+        let split_range = peek_result_ref(&result);
+        split_range.0.is_empty() ==> (split_range.1.start_frame() == self.start_frame() && split_range.1.end_frame() == self.end_frame())
+    })]
+    #[ensures(result.is_ok() ==> {
+        let split_range = peek_result_ref(&result);
+        split_range.1.is_empty() ==> (split_range.0.start_frame() == self.start_frame() && split_range.0.end_frame() == self.end_frame())
+    })]
+    #[ensures(result.is_ok() ==> {
+        let split_range = peek_result_ref(&result);
+        (!split_range.0.is_empty() && !split_range.1.is_empty()) ==> (
+            split_range.0.start_frame() == self.start_frame() 
+            && split_range.0.end_frame() == at_frame.minus(1) 
+            && split_range.1.start_frame() == at_frame 
+            && split_range.1.end_frame() == self.end_frame()
+        )
+    })]
+    #[ensures(result.is_err() ==> {
+        let orig_chunk = peek_err_ref(&result);
+        (orig_chunk.start_frame() == self.start_frame()) && (orig_chunk.end_frame() == self.end_frame())
+    })]
+    pub fn split_at(mut self, at_frame: Frame) -> Result<(Self, Self), Self> {
+        if self.is_empty() {
+            return Err(self);
+        }
+        let end_of_first = at_frame.minus(1);
 
-    //     let (first, second) = if at_frame == self.start_frame() && at_frame <= self.end_frame() {
-    //         let first  = TrustedChunk::empty();
-    //         let second = TrustedChunk::trusted_new(RangeInclusive::new(at_frame, self.end_frame()));
-    //         (first, second)
-    //     } 
-    //     else if at_frame == (self.end_frame() + 1) && end_of_first >= self.start_frame() {
-    //         let first  = TrustedChunk::trusted_new(RangeInclusive::new(self.start_frame(), self.end_frame())); 
-    //         let second = TrustedChunk::empty();
-    //         (first, second)
-    //     }
-    //     else if at_frame > self.start_frame() && end_of_first <= self.end_frame() {
-    //         let first  = TrustedChunk::trusted_new(RangeInclusive::new(self.start_frame(), end_of_first));
-    //         let second = TrustedChunk::trusted_new(RangeInclusive::new(at_frame, self.end_frame()));
-    //         (first, second)
-    //     }
-    //     else {
-    //         return Err(self);
-    //     };
-
-    //     core::mem::forget(self);   
-    //     Ok(( first, second ))
-    // }
+        let (first, second) = if at_frame == self.start_frame() && at_frame.less_than_equal(&self.end_frame()) {
+            let first  = FrameRange::empty();
+            let second = FrameRange::new(at_frame, self.end_frame());
+            (first, second)
+        } 
+        else if at_frame == self.end_frame().plus(1) && end_of_first.greater_than_equal(&self.start_frame()) {
+            let first  = FrameRange::new(self.start_frame(), self.end_frame()); 
+            let second = FrameRange::empty();
+            (first, second)
+        }
+        else if at_frame.greater_than(&self.start_frame()) && end_of_first.less_than_equal(&self.end_frame()) {
+            let first  = FrameRange::new(self.start_frame(), end_of_first);
+            let second = FrameRange::new(at_frame, self.end_frame());
+            (first, second)
+        }
+        else {
+            return Err(self);
+        };
+ 
+        Ok(( first, second ))
+    }
 
 
     // /// Merges `other` into `self`.
