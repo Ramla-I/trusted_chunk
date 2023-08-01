@@ -10,14 +10,15 @@ extern crate prusti_contracts;
 extern crate cfg_if;
 extern crate core;
 
-pub(crate) mod spec;
 pub(crate) mod external_spec;
-pub mod linked_list;
-pub mod static_array;
-// pub mod trusted_chunk;
 // mod test;
 mod frames;
 mod pages;
+
+pub use frames::frame_chunk;
+pub use pages::page_chunk;
+
+use frames::frame_range::FrameRange;
 
 cfg_if::cfg_if! {
 if #[cfg(prusti)] {
@@ -33,22 +34,23 @@ if #[cfg(prusti)] {
 }
 
 
-// #[cfg(not(prusti))] // prusti can't reason about fn pointers
-// pub fn init() -> Result<fn(RangeInclusive<usize>) -> trusted_chunk::TrustedChunk, &'static str> {
-//     if INIT.is_completed() {
-//         Err("Trusted Chunk has already been initialized and callback has been returned")
-//     } else {
-//         INIT.call_once(|| true);
-//         Ok(create_from_unmapped)
-//     }
-// }
+#[cfg(not(prusti))] // prusti can't reason about fn pointers
+pub fn init() -> Result<fn(FrameRange) -> frame_chunk::FrameChunk, &'static str> {
 
-// #[requires(*frames.start() <= *frames.end())]
-// #[ensures(result.start() == *frames.start())]
-// #[ensures(result.end() == *frames.end())]
-// fn create_from_unmapped(frames: RangeInclusive<usize>) -> trusted_chunk::TrustedChunk {
-//     trusted_chunk::TrustedChunk::trusted_new(frames)
-// }
+    if INIT.is_completed() {
+        Err("Trusted Chunk has already been initialized and callback has been returned")
+    } else {
+        INIT.call_once(|| true);
+        Ok(create_from_unmapped)
+    }
+}
+
+#[requires(frames.start_frame().less_than_equal(&frames.end_frame()))]
+#[ensures(result.start_frame() == frames.start_frame())]
+#[ensures(result.end_frame() == frames.end_frame())]
+fn create_from_unmapped(frames: FrameRange) -> frame_chunk::FrameChunk {
+    frame_chunk::FrameChunk::trusted_new(frames)
+}
 
 // /// A macro for defining `PageRange` and `FrameRange` structs
 // /// and implementing their common traits, which are generally identical.
