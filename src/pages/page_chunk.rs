@@ -5,6 +5,12 @@ use crate::external_spec::trusted_range_inclusive::*;
 #[cfg(not(prusti))]
 use range_inclusive::*;
 
+#[cfg(prusti)]
+use crate::pages::page_range::*;
+
+#[cfg(not(prusti))]
+use memory_structs::{Page, PageRange};
+
 use core::ops::{Deref, DerefMut};
 use crate::{
     *,
@@ -12,7 +18,6 @@ use crate::{
     pages::{ 
         linked_list_pages::*, 
         static_array_pages::*,
-        page_range::*
     }
 };
 
@@ -194,20 +199,24 @@ impl PageChunk {
     #[pure]
     #[trusted]
     #[ensures(result == *self.pages.start())]
-    pub fn start(&self) -> Page {
-        *self.pages.start()
+    pub fn start(&self) -> &Page {
+        self.pages.start()
     }
 
     #[pure]
     #[trusted]
     #[ensures(result == *self.pages.end())]
-    pub fn end(&self) -> Page {
-        *self.pages.end()
+    pub fn end(&self) -> &Page {
+        self.pages.end()
     }
 
     #[ensures(result.is_empty())]
     pub const fn empty() -> PageChunk {
         PageChunk { pages: PageRange::empty() }
+    }
+
+    pub const fn pages(&self) -> PageRange {
+        self.pages
     }
 
     #[pure]

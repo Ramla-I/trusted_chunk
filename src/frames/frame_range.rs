@@ -11,17 +11,16 @@ use core::cmp::{PartialOrd, Ord, Ordering};
 use crate::{
     *,
     external_spec::{trusted_option::*, trusted_result::*},
-    // spec::{framerange_spec::*},
 };
 
 pub(crate) const MAX_VIRTUAL_ADDRESS: usize = usize::MAX;
 pub(crate) const MAX_PAGE_NUMBER: usize = MAX_VIRTUAL_ADDRESS / PAGE_SIZE;
 pub(crate) const PAGE_SIZE: usize = 4096;
 
-//Prusti error: Unsupported constant type
-pub(crate) const MIN_FRAME: Frame = Frame { number: 0 };
-//Prusti error: Unsupported constant type
-pub(crate) const MAX_FRAME: Frame = Frame { number: 0xFF_FFFF_FFFF }; // usize::MAX & 0x000F_FFFF_FFFF_FFFF / PAGE_SIZE
+// //Prusti error: Unsupported constant type
+// pub(crate) const MIN_FRAME: Frame = Frame { number: 0 };
+// //Prusti error: Unsupported constant type
+// pub(crate) const MAX_FRAME: Frame = Frame { number: 0xFF_FFFF_FFFF }; // usize::MAX & 0x000F_FFFF_FFFF_FFFF / PAGE_SIZE
 
 pub(crate) const MIN_FRAME_NUMBER: usize = 0;
 pub(crate) const MAX_FRAME_NUMBER: usize = 0xFF_FFFF_FFFF; // usize::MAX & 0x000F_FFFF_FFFF_FFFF / PAGE_SIZE

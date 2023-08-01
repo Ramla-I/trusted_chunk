@@ -18,16 +18,19 @@ mod pages;
 pub use frames::frame_chunk;
 pub use pages::page_chunk;
 
-use frames::frame_range::FrameRange;
 
 cfg_if::cfg_if! {
-if #[cfg(prusti)] {
+    if #[cfg(prusti)] {
+    use frames::frame_range::FrameRange;
     use crate::external_spec::trusted_range_inclusive::*;
 } else {
     extern crate alloc;
     extern crate range_inclusive;
     extern crate spin;
+    extern crate memory_structs;
+
     use range_inclusive::*;
+    use memory_structs::FrameRange;
 
     static INIT: spin::Once<bool> = spin::Once::new();
 }

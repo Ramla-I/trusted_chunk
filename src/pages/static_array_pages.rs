@@ -5,9 +5,14 @@ use crate::external_spec::trusted_range_inclusive::*;
 #[cfg(not(prusti))]
 use range_inclusive::*;
 
+#[cfg(prusti)]
+use crate::pages::page_range::*;
+
+#[cfg(not(prusti))]
+use memory_structs::{Page, PageRange};
+
 use crate::{
     external_spec::{trusted_option::*, trusted_result::*},
-    pages::page_range::*,
 };
 use core::mem;
 

@@ -5,6 +5,14 @@ use crate::external_spec::trusted_range_inclusive::*;
 #[cfg(not(prusti))]
 use range_inclusive::*;
 
+#[cfg(prusti)]
+use crate::frames::frame_range::*;
+
+#[cfg(not(prusti))]
+use memory_structs::{Frame, FrameRange};
+
+
+
 use core::ops::{Deref, DerefMut};
 use crate::{
     *,
@@ -12,7 +20,6 @@ use crate::{
     frames::{ 
         linked_list_frame::*, 
         static_array_frame::*,
-        frame_range::*
     }
 };
 
@@ -194,15 +201,15 @@ impl FrameChunk {
     #[pure]
     #[trusted]
     #[ensures(result == *self.frames.start())]
-    pub fn start(&self) -> Frame {
-        *self.frames.start()
+    pub fn start(&self) -> &Frame {
+        self.frames.start()
     }
 
     #[pure]
     #[trusted]
     #[ensures(result == *self.frames.end())]
-    pub fn end(&self) -> Frame {
-        *self.frames.end()
+    pub fn end(&self) -> &Frame {
+        self.frames.end()
     }
 
     #[ensures(result.is_empty())]

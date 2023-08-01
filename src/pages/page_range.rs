@@ -5,26 +5,25 @@ use crate::external_spec::trusted_range_inclusive::*;
 #[cfg(not(prusti))]
 use range_inclusive::*;
 
+
 use core::char::MAX;
 use core::ops::{Deref, DerefMut, Add, Sub};
 use core::cmp::{PartialOrd, Ord, Ordering};
 use crate::{
     *,
     external_spec::{trusted_option::*, trusted_result::*},
-    // spec::{pagerange_spec::*},
 };
 
 pub(crate) const MAX_VIRTUAL_ADDRESS: usize = usize::MAX;
 pub(crate) const PAGE_SIZE: usize = 4096;
 
-//Prusti error: Unsupported constant type
-pub(crate) const MIN_PAGE: Page = Page { number: 0 };
-//Prusti error: Unsupported constant type
-pub(crate) const MAX_PAGE: Page = Page { number: 0xFF_FFFF_FFFF }; // usize::MAX & 0x000F_FFFF_FFFF_FFFF / PAGE_SIZE
+// //Prusti error: Unsupported constant type
+// pub(crate) const MIN_PAGE: Page = Page { number: 0 };
+// //Prusti error: Unsupported constant type
+// pub(crate) const MAX_PAGE: Page = Page { number: 0xFF_FFFF_FFFF }; 
 
 pub(crate) const MIN_PAGE_NUMBER: usize = 0;
-pub(crate) const MAX_PAGE_NUMBER: usize = 0xFF_FFFF_FFFF; // usize::MAX & 0x000F_FFFF_FFFF_FFFF / PAGE_SIZE
-
+pub(crate) const MAX_PAGE_NUMBER: usize = 0xF_FFFF_FFFF_FFFF; // usize::MAX | 0xFFFF_0000_0000_0000 / PAGE_SIZE
 
 #[pure]
 fn min(a: usize, b: usize) -> usize {
