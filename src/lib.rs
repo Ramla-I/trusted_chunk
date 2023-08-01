@@ -12,11 +12,11 @@ extern crate core;
 
 pub(crate) mod spec;
 pub(crate) mod external_spec;
-// pub mod linked_list;
-// pub mod static_array;
+pub mod linked_list;
+pub mod static_array;
 // pub mod trusted_chunk;
 // mod test;
-mod frame_range;
+mod frames;
 
 cfg_if::cfg_if! {
 if #[cfg(prusti)] {

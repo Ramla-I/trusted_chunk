@@ -14,17 +14,17 @@ use crate::{
     // spec::{framerange_spec::*},
 };
 
-pub const MAX_VIRTUAL_ADDRESS: usize = usize::MAX;
-pub const MAX_PAGE_NUMBER: usize = MAX_VIRTUAL_ADDRESS / PAGE_SIZE;
-pub const PAGE_SIZE: usize = 4096;
+pub(crate) const MAX_VIRTUAL_ADDRESS: usize = usize::MAX;
+pub(crate) const MAX_PAGE_NUMBER: usize = MAX_VIRTUAL_ADDRESS / PAGE_SIZE;
+pub(crate) const PAGE_SIZE: usize = 4096;
 
 //Prusti error: Unsupported constant type
-const MIN_FRAME: Frame = Frame { number: 0 };
+pub(crate) const MIN_FRAME: Frame = Frame { number: 0 };
 //Prusti error: Unsupported constant type
-const MAX_FRAME: Frame = Frame { number: 0xFF_FFFF_FFFF }; // usize::MAX & 0x000F_FFFF_FFFF_FFFF / PAGE_SIZE
+pub(crate) const MAX_FRAME: Frame = Frame { number: 0xFF_FFFF_FFFF }; // usize::MAX & 0x000F_FFFF_FFFF_FFFF / PAGE_SIZE
 
-const MIN_FRAME_NUMBER: usize = 0;
-const MAX_FRAME_NUMBER: usize = 0xFF_FFFF_FFFF; // usize::MAX & 0x000F_FFFF_FFFF_FFFF / PAGE_SIZE
+pub(crate) const MIN_FRAME_NUMBER: usize = 0;
+pub(crate) const MAX_FRAME_NUMBER: usize = 0xFF_FFFF_FFFF; // usize::MAX & 0x000F_FFFF_FFFF_FFFF / PAGE_SIZE
 
 
 #[pure]
@@ -202,7 +202,7 @@ impl Frame {
 /// A struct representing an unallocated region in memory.
 /// Its functions are formally verified to prevent range overlaps between chunks.
 // #[cfg_attr(not(prusti), derive(Debug))]
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Copy, Clone, PartialEq, Eq)]
 pub struct FrameRange(RangeInclusive<Frame>);
 
 impl FrameRange {
@@ -242,17 +242,19 @@ impl FrameRange {
     }
 
     #[pure]
+    #[trusted] // has to be trusted to call itself, which then requires us to define a spec for the fn as well :(
+    #[ensures(result == other.range_overlaps(&self))] // if we dont have this condition, then post-condition of push_unique_with_precond wont' verify
+    #[ensures({
+        let starts = max_frame(self.start_frame(), other.start_frame());
+        let ends   = min_frame(self.end_frame(), other.end_frame());
+        result == starts.less_than_equal(&ends) 
+   })]
     /// Returning a FrameRange here requires use to set the RangeInclusive new function as pure which
-    /// requires Idx to be Copy.
-    /// so just return bool.
+    /// requires Idx to be Copy, so just return bool.
     pub fn range_overlaps(&self, other: &FrameRange) -> bool {
         let starts = max_frame(self.start_frame(), other.start_frame());
         let ends   = min_frame(self.end_frame(), other.end_frame());
-        if starts.less_than_equal(&ends) {
-            true
-        } else {
-            false
-        }
+        starts.less_than_equal(&ends)
     }
 
     #[pure]
