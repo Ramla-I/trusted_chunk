@@ -20,13 +20,11 @@ pub const PAGE_SIZE: usize = 4096;
 
 //Prusti error: Unsupported constant type
 const MIN_FRAME: Frame = Frame { number: 0 };
-//usize::MAX & 0x000F_FFFF_FFFF_FFFF / PAGE_SIZE
-const MAX_FRAME: Frame = Frame { number: 0xFF_FFFF_FFFF };
-
 //Prusti error: Unsupported constant type
+const MAX_FRAME: Frame = Frame { number: 0xFF_FFFF_FFFF }; // usize::MAX & 0x000F_FFFF_FFFF_FFFF / PAGE_SIZE
+
 const MIN_FRAME_NUMBER: usize = 0;
-//usize::MAX & 0x000F_FFFF_FFFF_FFFF / PAGE_SIZE
-const MAX_FRAME_NUMBER: usize = 0xFF_FFFF_FFFF;
+const MAX_FRAME_NUMBER: usize = 0xFF_FFFF_FFFF; // usize::MAX & 0x000F_FFFF_FFFF_FFFF / PAGE_SIZE
 
 
 #[pure]
@@ -70,7 +68,7 @@ fn saturating_sub(a: usize, b: usize) -> usize {
 
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
-#[cfg_attr(not(prusti), derive(Debug))]
+// #[cfg_attr(not(prusti), derive(Debug))]
 pub struct Frame{
     number: usize
 }
@@ -126,7 +124,7 @@ impl Add<usize> for Frame {
     type Output = Frame;
     fn add(self, rhs: usize) -> Frame {
         Frame {
-            number: min(0xFF_FFFF_FFFF, self.number.saturating_add(rhs)),
+            number: min(MAX_FRAME_NUMBER, self.number.saturating_add(rhs)),
         }
     }
 }
@@ -145,13 +143,15 @@ impl Frame {
     pub const fn number(&self) -> usize {
         self.number
     }
+}
 
+// The newly added methods for Frame required for verification
+impl Frame {
     #[pure]
     #[trusted]
     #[ensures(result.number == min(MAX_FRAME_NUMBER, saturating_add(self.number, rhs)))]
     #[ensures(result.greater_than_equal(&self))]
     #[ensures(rhs == 0 ==> result == self)]
-    #[ensures(rhs > 0 ==> result.greater_than(&self))]
     pub fn plus(self, rhs: usize) -> Self {
         self + rhs
     }
@@ -161,7 +161,6 @@ impl Frame {
     #[ensures(result.number == saturating_sub(self.number, rhs))]
     #[ensures(result.less_than_equal(&self))]
     #[ensures(rhs == 0 ==> result == self)]
-    #[ensures(rhs > 0 ==> result.less_than(&self))]
     pub fn minus(self, rhs: usize) -> Self {
         self - rhs
     }
@@ -197,16 +196,13 @@ impl Frame {
     pub fn greater_than_equal(self, rhs: &Self) -> bool {
         self >= *rhs
     }
-
-
 }
-
 
 
 /// A struct representing an unallocated region in memory.
 /// Its functions are formally verified to prevent range overlaps between chunks.
-#[cfg_attr(not(prusti), derive(Debug, PartialEq, Eq))]
-#[derive(Copy, Clone)]
+// #[cfg_attr(not(prusti), derive(Debug))]
+#[derive(Clone, PartialEq, Eq)]
 pub struct FrameRange(RangeInclusive<Frame>);
 
 impl FrameRange {
@@ -216,6 +212,14 @@ impl FrameRange {
         FrameRange(RangeInclusive::new(start, end))
     }
 
+    #[ensures(result.is_empty())]
+    pub const fn empty() -> FrameRange {
+        FrameRange( RangeInclusive::new(Frame{ number: 1 }, Frame{ number: 0 }) )
+    }
+}
+
+// The newly added methods for FrameRange required for verification
+impl FrameRange {
     #[pure]
     #[trusted]
     #[ensures(result == *self.0.start())]
@@ -230,15 +234,6 @@ impl FrameRange {
         *self.0.end()
     }
 
-    pub fn frames(&self) -> RangeInclusive<Frame> {
-        self.0
-    }
-
-    #[ensures(result.is_empty())]
-    pub const fn empty() -> FrameRange {
-        FrameRange( RangeInclusive::new(Frame{ number: 1 }, Frame{ number: 0 }) )
-    }
-
     #[pure]
     #[ensures(result == (self.start_frame().greater_than(&self.end_frame())))]
     #[ensures(result == !(self.start_frame().less_than_equal(&self.end_frame())))]
@@ -250,24 +245,10 @@ impl FrameRange {
     /// Returning a FrameRange here requires use to set the RangeInclusive new function as pure which
     /// requires Idx to be Copy.
     /// so just return bool.
-    pub fn overlap(&self, other: &FrameRange) -> bool {
+    pub fn range_overlaps(&self, other: &FrameRange) -> bool {
         let starts = max_frame(self.start_frame(), other.start_frame());
         let ends   = min_frame(self.end_frame(), other.end_frame());
         if starts.less_than_equal(&ends) {
-            true
-        } else {
-            false
-        }
-    }
-
-    #[pure]
-    /// Returning a FrameRange here requires use to set the RangeInclusive new function as pure which
-    /// requires Idx to be Copy.
-    /// so just return bool.
-    pub fn overlap_numbers(&self, other: &FrameRange) -> bool {
-        let starts = max(self.start_frame().number, other.start_frame().number);
-        let ends   = min(self.end_frame().number, other.end_frame().number);
-        if starts <= ends {
             true
         } else {
             false
@@ -281,7 +262,6 @@ impl FrameRange {
         && (other.end_frame().less_than_equal(&self.end_frame()))
     }
 
-
     /// Splits a range into 1-3 ranges, depending on where the split is at.
     /// It is formally verified that the resulting chunks are disjoint, contiguous and their start/end is equal to that of the original chunk.
     /// 
@@ -292,9 +272,9 @@ impl FrameRange {
     /// * If it fails, then the original chunk is returned
     #[ensures(result.is_ok() ==> {
         let split_range = peek_result_ref(&result);
-        ((split_range.0).is_some() ==> !peek_option_ref(&split_range.0).overlap(&split_range.1)) 
-        && ((split_range.2).is_some() ==> !split_range.1.overlap(peek_option_ref(&split_range.2)))
-        && (((split_range.0).is_some() && (split_range.2).is_some()) ==> !peek_option_ref(&split_range.0).overlap(peek_option_ref(&split_range.2)))
+        ((split_range.0).is_some() ==> !peek_option_ref(&split_range.0).range_overlaps(&split_range.1)) 
+        && ((split_range.2).is_some() ==> !split_range.1.range_overlaps(peek_option_ref(&split_range.2)))
+        && (((split_range.0).is_some() && (split_range.2).is_some()) ==> !peek_option_ref(&split_range.0).range_overlaps(peek_option_ref(&split_range.2)))
     })]
     #[ensures(result.is_ok() ==> {
         let split_range = peek_result_ref(&result);
@@ -331,7 +311,7 @@ impl FrameRange {
 
         let start_to_end = frames_to_extract;
 
-        let after_end = if frames_to_extract.end_frame() == max_frame || frames_to_extract.end_frame() == self.end_frame() {
+        let after_end = if end_frame == max_frame || end_frame == self.end_frame() {
             None
         } else {
             Some(FrameRange::new(end_frame.plus(1), self.end_frame())) 
