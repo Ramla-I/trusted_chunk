@@ -406,47 +406,44 @@ impl FrameRange {
     }
 
 
-    // /// Merges `other` into `self`.
-    // /// Succeeds if `other` lies right before `self` or right after.
-    // /// 
-    // /// # Post-conditions:
-    // /// * If it succeeds, then `other` and `self` were contiguous, and either `self`'s start bound has been updated to `other`'s start 
-    // /// or `self`s end has been updated to `other`'s end
-    // /// * If it fails, then `self` remains unchanged and `other` is returned
-    // #[ensures(result.is_ok() ==> 
-    //     (old(self.start_frame()) == other.end_frame() + 1 && self.start_frame() == other.start_frame() && self.end_frame() == old(self.end_frame())) 
-    //     || 
-    //     (old(self.end_frame()) + 1 == other.start_frame() && self.end_frame() == other.end_frame() && self.start_frame() == old(self.start_frame()))
-    // )]
-    // #[ensures(result.is_err() ==> {
-    //     let chunk = peek_err_ref(&result);
-    //     (chunk.start_frame() == other.start_frame()) && (chunk.end_frame() == other.end_frame()) 
-    // })]
-    // #[ensures(result.is_err() ==> {
-    //     (self.start_frame() == old(self.start_frame())) && (self.end_frame() == old(self.end_frame())) 
-    // })]
-    // pub fn merge(&mut self, other: TrustedChunk) -> Result<(), TrustedChunk> {
-    //     if self.is_empty() | other.is_empty() {
-    //         return Err(other);
-    //     }
+    /// Merges `other` into `self`.
+    /// Succeeds if `other` lies right before `self` or right after.
+    /// 
+    /// # Post-conditions:
+    /// * If it succeeds, then `other` and `self` were contiguous, and either `self`'s start bound has been updated to `other`'s start 
+    /// or `self`s end has been updated to `other`'s end
+    /// * If it fails, then `self` remains unchanged and `other` is returned
+    #[ensures(result.is_ok() ==> 
+        (old(self.start_frame()) == other.end_frame().plus(1) && self.start_frame() == other.start_frame() && self.end_frame() == old(self.end_frame())) 
+        || 
+        (old(self.end_frame()).plus(1) == other.start_frame() && self.end_frame() == other.end_frame() && self.start_frame() == old(self.start_frame()))
+    )]
+    #[ensures(result.is_err() ==> {
+        let chunk = peek_err_ref(&result);
+        (chunk.start_frame() == other.start_frame()) && (chunk.end_frame() == other.end_frame()) 
+    })]
+    #[ensures(result.is_err() ==> {
+        (self.start_frame() == old(self.start_frame())) && (self.end_frame() == old(self.end_frame())) 
+    })]
+    pub fn merge(&mut self, other: Self) -> Result<(), Self> {
+        if self.is_empty() || other.is_empty() {
+            return Err(other);
+        }
 
-    //     if self.start_frame() == other.end_frame() + 1 {
-    //         // `other` comes contiguously before `self`
-    //         self.frames = RangeInclusive::new(other.start_frame(), self.end_frame());
-    //     } 
-    //     else if self.end_frame() + 1 == other.start_frame() {
-    //         // `self` comes contiguously before `other`
-    //         self.frames = RangeInclusive::new(self.start_frame(), other.end_frame());
-    //     }
-    //     else {
-    //         // non-contiguous
-    //         return Err(other);
-    //     }
-
-    //     // ensure the now-merged TrustedChunk doesn't run its drop handler (currently not implemented, but to prevent any future issues.)
-    //     core::mem::forget(other); 
-    //     Ok(())
-    // }
+        if self.start_frame() == other.end_frame().plus(1) {
+            // `other` comes contiguously before `self`
+            *self = FrameRange::new(other.start_frame(), self.end_frame());
+        } 
+        else if self.end_frame().plus(1) == other.start_frame() {
+            // `self` comes contiguously before `other`
+            *self = FrameRange::new(self.start_frame(), other.end_frame());
+        }
+        else {
+            // non-contiguous
+            return Err(other);
+        } 
+        Ok(())
+    }
 }
 
 
