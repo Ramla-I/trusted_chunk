@@ -53,6 +53,14 @@ impl<U: UnitTrait> PartialEq for Range<U> {
 #[derive(Copy, Clone, PartialEq, Eq)]
 pub struct Range<U: UnitTrait>(RangeInclusive<U>);
 
+impl<U: UnitTrait> UniqueCheck for Range<U> {
+    #[pure]
+    #[trusted] // has to be trusted to call itself, which then requires us to define a spec for the fn as well :(
+    fn range_overlaps(&self, other: &Self) -> bool {
+        self.range_overlaps(other)
+    }
+}
+
 impl<U: UnitTrait> Range<U> {
     #[ensures(result.start_frame() == start)]
     #[ensures(result.end_frame() == end)]
