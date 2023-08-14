@@ -17,12 +17,6 @@ use crate::{
 pub(crate) const MAX_VIRTUAL_ADDRESS: usize = usize::MAX;
 pub(crate) const MAX_PAGE_NUMBER: usize = MAX_VIRTUAL_ADDRESS / PAGE_SIZE;
 pub(crate) const PAGE_SIZE: usize = 4096;
-
-//Prusti error: Unsupported constant type
-pub(crate) const MIN_FRAME: Frame = Frame { number: 0 };
-//Prusti error: Unsupported constant type
-pub(crate) const MAX_FRAME: Frame = Frame { number: 0xFF_FFFF_FFFF }; // usize::MAX & 0x000F_FFFF_FFFF_FFFF / PAGE_SIZE
-
 pub(crate) const MIN_FRAME_NUMBER: usize = 0;
 pub(crate) const MAX_FRAME_NUMBER: usize = 0xFF_FFFF_FFFF; // usize::MAX & 0x000F_FFFF_FFFF_FFFF / PAGE_SIZE
 
@@ -38,183 +32,38 @@ fn max(a: usize, b: usize) -> usize {
 }
 
 #[pure]
-fn min_frame<U: UnitTrait + Copy + PartialEq + PartialOrd>(a: U, b: U) -> U {
+fn min_mem_unit<U: UnitTrait>(a: U, b: U) -> U {
     if a.less_than(&b) { a } else { b }
 }
 
 #[pure]
-fn max_frame<U: UnitTrait + Copy + PartialEq + PartialOrd>(a: U, b: U) -> U {
+fn max_mem_unit<U: UnitTrait>(a: U, b: U) -> U {
     if a.greater_than(&b) { a } else { b }
 }
 
-#[pure]
-#[trusted]
-#[ensures(usize::MAX - a < b ==> result == usize::MAX)]
-#[ensures(usize::MAX - a > b ==> result == a + b)]
-#[ensures(usize::MAX - a == b ==> result == a + b)]
-#[ensures(usize::MAX - a == b ==> result == usize::MAX)]
-fn saturating_add(a: usize, b: usize) -> usize {
-     a.saturating_add(b)
-}
-
-#[pure]
-#[trusted]
-#[ensures(a < b ==> result == 0)]
-#[ensures(a >= b ==> result == a - b)]
-#[ensures(a == b ==> result == 0)]
-fn saturating_sub(a: usize, b: usize) -> usize {
-     a.saturating_sub(b)
-}
-
-
-#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
-// #[cfg_attr(not(prusti), derive(Debug))]
-pub struct Frame{
-    number: usize
-}
-
-impl Deref for Frame {
-    type Target = usize;
-    #[pure]
-    fn deref(&self) -> &Self::Target {
-        &self.number
-    }
-}
-
 #[extern_spec]
-impl PartialEq for Frame {
+impl<U: UnitTrait> PartialEq for Range<U> {
     #[pure]
-    #[ensures(result == (self.number == other.number))]
     fn eq(&self, other: &Self) -> bool;
 }
-
-#[extern_spec]
-impl PartialOrd for usize {
-    #[pure]
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering>;
-}
-
-#[extern_spec]
-impl PartialOrd for Frame {
-    #[pure]
-    #[ensures(result == self.number.partial_cmp(&other.number))]
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering>;
-
-    // Uncommenting these leads to an unexpected panic in Prusti
-    // but without these can't use comparison operators for frames in pure functions.
-    
-    // #[pure]
-    // #[ensures(result == (self.number < other.number))]
-    // fn lt(&self, other: &Self) -> bool;
-
-    // #[pure]
-    // #[ensures(result == (self.number <= other.number))]
-    // fn le(&self, other: &Self) -> bool;
-    
-    // #[pure]
-    // #[ensures(result == (self.number > other.number))]
-    // fn gt(&self, other: &Self) -> bool;
-    
-    // #[pure]
-    // #[ensures(result == (self.number >= other.number))]
-    // fn ge(&self, other: &Self) -> bool;
-}
-
-impl Add<usize> for Frame {
-    type Output = Frame;
-    fn add(self, rhs: usize) -> Frame {
-        Frame {
-            number: min(MAX_FRAME_NUMBER, self.number.saturating_add(rhs)),
-        }
-    }
-}
-
-impl Sub<usize> for Frame {
-    type Output = Frame;
-    fn sub(self, rhs: usize) -> Frame {
-        Frame {
-            number: self.number.saturating_sub(rhs),
-        }
-    }
-}
-
-impl Frame {
-    #[pure]
-    pub const fn number(&self) -> usize {
-        self.number
-    }
-}
-
-// The newly added methods for Frame required for verification
-impl Frame {
-    #[pure]
-    #[trusted]
-    #[ensures(result.number == min(MAX_FRAME_NUMBER, saturating_add(self.number, rhs)))]
-    #[ensures(result.greater_than_equal(&self))]
-    #[ensures(rhs == 0 ==> result == self)]
-    pub fn plus(self, rhs: usize) -> Self {
-        self + rhs
-    }
-
-    #[pure]
-    #[trusted]
-    #[ensures(result.number == saturating_sub(self.number, rhs))]
-    #[ensures(result.less_than_equal(&self))]
-    #[ensures(rhs == 0 ==> result == self)]
-    pub fn minus(self, rhs: usize) -> Self {
-        self - rhs
-    }
-
-    #[pure]
-    #[trusted]
-    #[ensures(result == (self.number < rhs.number))]
-    #[ensures(!result ==> self.greater_than_equal(&rhs))]
-    pub fn less_than(self, rhs: &Self) -> bool {
-        self < *rhs
-    }
-
-    #[pure]
-    #[trusted]
-    #[ensures(result == (self.number <= rhs.number))]
-    #[ensures(!result ==> self.greater_than(&rhs))]
-    pub fn less_than_equal(self, rhs: &Self) -> bool {
-        self <= *rhs
-    }
-
-    #[pure]
-    #[trusted]
-    #[ensures(result == (self.number > rhs.number))]
-    #[ensures(!result ==> self.less_than_equal(&rhs))]
-    pub fn greater_than(self, rhs: &Self) -> bool {
-        self > *rhs
-    }
-
-    #[pure]
-    #[trusted]
-    #[ensures(result == (self.number >= rhs.number))]
-    #[ensures(!result ==> self.less_than(&rhs))]
-    pub fn greater_than_equal(self, rhs: &Self) -> bool {
-        self >= *rhs
-    }
-}
-
 
 /// A struct representing an unallocated region in memory.
 /// Its functions are formally verified to prevent range overlaps between chunks.
 // #[cfg_attr(not(prusti), derive(Debug))]
 #[derive(Copy, Clone, PartialEq, Eq)]
-pub struct Range<U: UnitTrait + PartialEq + Copy + PartialOrd>(RangeInclusive<U>);
+pub struct Range<U: UnitTrait>(RangeInclusive<U>);
 
-impl<U: UnitTrait + PartialEq + Copy + PartialOrd> Range<U> {
+impl<U: UnitTrait> Range<U> {
     #[ensures(result.start_frame() == start)]
     #[ensures(result.end_frame() == end)]
     pub const fn new(start: U, end: U) -> Range<U> {
         Range(RangeInclusive::new(start, end))
     }
 
+    // #[trusted]
     #[ensures(result.is_empty())]
     pub fn empty() -> Range<U> {
-        Range( RangeInclusive::new(U::new(1), U::new(0)) )
+        Range::new(U::new(1), U::new(0))
     }
 }
 
@@ -245,15 +94,15 @@ impl <U: UnitTrait + PartialEq + Copy + PartialOrd> Range<U> {
     #[trusted] // has to be trusted to call itself, which then requires us to define a spec for the fn as well :(
     #[ensures(result == other.range_overlaps(&self))] // if we dont have this condition, then post-condition of push_unique_with_precond wont' verify
     #[ensures({
-        let starts = max_frame(self.start_frame(), other.start_frame());
-        let ends   = min_frame(self.end_frame(), other.end_frame());
+        let starts = max_mem_unit(self.start_frame(), other.start_frame());
+        let ends   = min_mem_unit(self.end_frame(), other.end_frame());
         result == starts.less_than_equal(&ends) 
    })]
     /// Returning a FrameRange here requires use to set the RangeInclusive new function as pure which
     /// requires Idx to be Copy, so just return bool.
     pub fn range_overlaps(&self, other: &Range<U>) -> bool {
-        let starts = max_frame(self.start_frame(), other.start_frame());
-        let ends   = min_frame(self.end_frame(), other.end_frame());
+        let starts = max_mem_unit(self.start_frame(), other.start_frame());
+        let ends   = min_mem_unit(self.end_frame(), other.end_frame());
         starts.less_than_equal(&ends)
     }
 
@@ -286,36 +135,53 @@ impl <U: UnitTrait + PartialEq + Copy + PartialOrd> Range<U> {
     #[ensures(result.is_ok() ==> {
         let split_range = peek_result_ref(&result);
         ((split_range.0).is_some() ==> peek_option_ref(&split_range.0).start_frame() == self.start_frame())
-        && ((split_range.0).is_none() ==> (split_range.1.start_frame() == self.start_frame() || (split_range.1.start_frame().number == MIN_FRAME_NUMBER)))
+        && ((split_range.0).is_none() ==> (split_range.1.start_frame() == self.start_frame() || (split_range.1.start_frame().number() == MIN_FRAME_NUMBER)))
         && ((split_range.2).is_some() ==> peek_option_ref(&split_range.2).end_frame() == self.end_frame())
-        && ((split_range.2).is_none() ==> ((split_range.1.end_frame() == self.end_frame()) || (split_range.1.end_frame().number == MAX_FRAME_NUMBER)))
+        && ((split_range.2).is_none() ==> ((split_range.1.end_frame() == self.end_frame()) || (split_range.1.end_frame().number() >= MAX_FRAME_NUMBER)))
     })]
     #[ensures(result.is_err() ==> {
         let orig_range = peek_err_ref(&result);
         (orig_range.start_frame() == self.start_frame()) && (orig_range.end_frame() == self.end_frame())
     })]
     pub fn split_range(self, frames_to_extract: Range<U>) -> Result<(Option<Range<U>>, Range<U>, Option<Range<U>>), Range<U>> {
-        let min_frame = U::new(MIN_FRAME_NUMBER);
-        let max_frame = U::new(MAX_FRAME_NUMBER);
+        let min_mem_unit = U::new(MIN_FRAME_NUMBER);
+        let max_mem_unit = U::new(MAX_FRAME_NUMBER);
 
         if !self.contains_range(&frames_to_extract) {
             return Err(self);
         }
 
+        
         let start_frame = frames_to_extract.start_frame();
         let end_frame = frames_to_extract.end_frame();
+        prusti_assert!(self.start_frame().less_than_equal(&start_frame));
+        prusti_assert!(self.end_frame().greater_than_equal(&end_frame));
 
-        let before_start = if start_frame == min_frame || start_frame == self.start_frame() {
+        let before_start = if start_frame == min_mem_unit || start_frame == self.start_frame() {
             None
         } else {
+            prusti_assert!(self.start_frame().less_than(&start_frame));
+            prusti_assert!(self.start_frame().less_than_equal(&start_frame.minus(1)));
             Some(Range::new(self.start_frame(), start_frame.minus(1)))
         };
 
         let start_to_end = frames_to_extract;
 
-        let after_end = if end_frame == max_frame || end_frame == self.end_frame() {
+        // impossible for end_frame to be greater than max_mem_unit so should add a precond
+        let after_end = if end_frame.greater_than_equal(&max_mem_unit) || end_frame == self.end_frame() {
             None
         } else {
+            prusti_assert!(end_frame.less_than(&max_mem_unit));
+            prusti_assert!(self.end_frame().greater_than(&end_frame));
+            prusti_assert!(self.end_frame().greater_than_equal(&end_frame.plus(1)));
+            prusti_assert!(self.end_frame().greater_than_equal(&start_to_end.end_frame().plus(1)));
+            prusti_assert!(self.end_frame().greater_than(&start_to_end.end_frame()));
+            prusti_assert!(end_frame.plus(1).greater_than(&end_frame));
+
+            let range = Range::new(end_frame.plus(1), self.end_frame());
+            prusti_assert!(range.start_frame().greater_than(&start_to_end.end_frame()));
+            prusti_assert!(range.start_frame().greater_than(&start_to_end.end_frame()));
+
             Some(Range::new(end_frame.plus(1), self.end_frame())) 
         };
 

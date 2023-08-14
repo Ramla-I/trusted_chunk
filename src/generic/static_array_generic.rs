@@ -9,18 +9,15 @@ use crate::{
     external_spec::{trusted_option::*, trusted_result::*},
     generic::range_trait::*,
 };
-use core::mem;
 
-pub struct StaticArray<U: UnitTrait + Copy, T: RangeTrait<U> + Copy + PartialEq> {
+pub struct StaticArray<T: UniqueCheck> {
     pub(crate) arr: [Option<T>; 64], // only public so it can be used in spec
-    // _u: core::marker::PhantomData<U>
 }
 
-impl<U: UnitTrait + Copy, T: RangeTrait<U> + Copy + PartialEq> StaticArray<U,T> {
+impl<T: UniqueCheck> StaticArray<T> {
     pub const fn new() -> Self {
         StaticArray {
             arr: [None; 64],
-            // _u: core::marker::PhantomData
         }
     }
 

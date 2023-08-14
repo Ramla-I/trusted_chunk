@@ -17,16 +17,16 @@ use crate::{
 use core::{mem, marker::Copy, ops::Deref};
 
 
-pub struct List<T: RangeTrait + Copy + PartialEq> {
+pub struct List<T: UniqueCheck> {
     head: Link<T>,
 }
 
-pub(crate) enum Link<T: RangeTrait + Copy + PartialEq> {
+pub(crate) enum Link<T: UniqueCheck> {
     Empty,
     More(Box<Node<T>>)
 }
 
-pub(crate) struct Node<T: RangeTrait + Copy + PartialEq> {
+pub(crate) struct Node<T: UniqueCheck> {
     elem: T,
     next: Link<T>,
 }
@@ -38,12 +38,12 @@ pub(crate) struct Node<T: RangeTrait + Copy + PartialEq> {
 #[ensures(old(dest.len()) == result.len())]
 #[ensures(forall(|i: usize| (0 <= i && i < result.len()) ==> 
                 old(dest.lookup(i)) == result.lookup(i)))] 
-fn replace<T: RangeTrait + Copy + PartialEq>(dest: &mut Link<T>, src: Link<T>) -> Link<T> {
+fn replace<T: UniqueCheck>(dest: &mut Link<T>, src: Link<T>) -> Link<T> {
     mem::replace(dest, src)
 }
 
 
-impl<T: RangeTrait + Copy + PartialEq> List<T> {
+impl<T: UniqueCheck> List<T> {
 
     #[pure]
     pub fn len(&self) -> usize {
@@ -199,7 +199,7 @@ impl<T: RangeTrait + Copy + PartialEq> List<T> {
 
 }
 
-impl<T: RangeTrait + Copy + PartialEq> Link<T> {
+impl<T: UniqueCheck> Link<T> {
 
     /// Recursive function that returns length of the list starting from this Link/ Node
     /// 
