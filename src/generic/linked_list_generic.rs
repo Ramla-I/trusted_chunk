@@ -38,12 +38,12 @@ pub(crate) struct Node<T: UniqueCheck> {
 #[ensures(old(dest.len()) == result.len())]
 #[ensures(forall(|i: usize| (0 <= i && i < result.len()) ==> 
                 old(dest.lookup(i)) == result.lookup(i)))] 
-fn replace<T: UniqueCheck>(dest: &mut Link<T>, src: Link<T>) -> Link<T> {
+fn replace<T: UniqueCheck + Copy>(dest: &mut Link<T>, src: Link<T>) -> Link<T> {
     mem::replace(dest, src)
 }
 
 
-impl<T: UniqueCheck> List<T> {
+impl<T: UniqueCheck + Copy> List<T> {
 
     #[pure]
     pub fn len(&self) -> usize {
@@ -56,7 +56,7 @@ impl<T: UniqueCheck> List<T> {
     /// * index is less than the length
     #[pure]
     #[requires(0 <= index && index < self.len())]
-    pub fn lookup(&self, index: usize) -> T {
+    pub fn lookup(&self, index: usize) -> T where T: Copy {
         self.head.lookup(index)
     }
 
@@ -77,8 +77,8 @@ impl<T: UniqueCheck> List<T> {
     /// * `elem` is added at index 0
     /// * all previous elements remain in the list, just moved one index forward
     #[ensures(self.len() == old(self.len()) + 1)] 
-    #[ensures(self.lookup(0) == elem)]
-    #[ensures(forall(|i: usize| (1 <= i && i < self.len()) ==> old(self.lookup(i-1)) == self.lookup(i)))]
+    #[ensures(self.lookup(0).equals(&elem))]
+    #[ensures(forall(|i: usize| (1 <= i && i < self.len()) ==> old(self.lookup(i-1)).equals(&self.lookup(i))))]
     pub fn push(&mut self, elem: T) {
         let new_node = Box::new(Node {
             elem: elem,

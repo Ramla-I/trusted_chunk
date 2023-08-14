@@ -59,6 +59,12 @@ impl<U: UnitTrait> UniqueCheck for Range<U> {
     fn range_overlaps(&self, other: &Self) -> bool {
         self.range_overlaps(other)
     }
+
+    #[pure]
+    #[trusted]
+    fn equals(&self, other: &Self) -> bool {
+        self == other
+    }
 }
 
 impl<U: UnitTrait> Range<U> {
