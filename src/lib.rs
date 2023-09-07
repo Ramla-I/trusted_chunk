@@ -19,6 +19,7 @@ pub(crate) mod external_spec;
 // mod frames;
 // mod pages;
 mod generic;
+mod frames_generic;
 
 cfg_if::cfg_if! {
 if #[cfg(prusti)] {

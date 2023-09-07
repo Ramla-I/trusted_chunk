@@ -77,8 +77,8 @@ impl<T: UniqueCheck + Copy> List<T> {
     /// * `elem` is added at index 0
     /// * all previous elements remain in the list, just moved one index forward
     #[ensures(self.len() == old(self.len()) + 1)] 
-    #[ensures(self.lookup(0).equals(&elem))]
-    #[ensures(forall(|i: usize| (1 <= i && i < self.len()) ==> old(self.lookup(i-1)).equals(&self.lookup(i))))]
+    #[ensures(self.lookup(0) == elem)]
+    #[ensures(forall(|i: usize| (1 <= i && i < self.len()) ==> old(self.lookup(i-1)) == self.lookup(i)))]
     pub fn push(&mut self, elem: T) {
         let new_node = Box::new(Node {
             elem: elem,
