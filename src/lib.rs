@@ -13,12 +13,12 @@ extern crate core;
 pub(crate) mod external_spec;
 // mod test;
 mod frames;
-mod pages;
+// mod pages;
 
-pub use frames::frame_chunk;
-pub use pages::page_chunk;
+// pub use frames::frame_chunk;
+// pub use pages::page_chunk;
 
-use frames::frame_range::FrameRange;
+// use frames::frame_range::FrameRange;
 
 cfg_if::cfg_if! {
 if #[cfg(prusti)] {
@@ -34,21 +34,21 @@ if #[cfg(prusti)] {
 }
 
 
-#[cfg(not(prusti))] // prusti can't reason about fn pointers
-pub fn init_frame_chunk() -> Result<fn(FrameRange) -> frame_chunk::FrameChunk, &'static str> {
+// #[cfg(not(prusti))] // prusti can't reason about fn pointers
+// pub fn init_frame_chunk() -> Result<fn(FrameRange) -> frame_chunk::FrameChunk, &'static str> {
 
-    if INIT.is_completed() {
-        Err("Trusted Chunk has already been initialized and callback has been returned")
-    } else {
-        INIT.call_once(|| true);
-        Ok(create_from_unmapped)
-    }
-}
+//     if INIT.is_completed() {
+//         Err("Trusted Chunk has already been initialized and callback has been returned")
+//     } else {
+//         INIT.call_once(|| true);
+//         Ok(create_from_unmapped)
+//     }
+// }
 
-#[requires(frames.start_frame().less_than_equal(&frames.end_frame()))]
-#[ensures(result.start_frame() == frames.start_frame())]
-#[ensures(result.end_frame() == frames.end_frame())]
-fn create_from_unmapped(frames: FrameRange) -> frame_chunk::FrameChunk {
-    frame_chunk::FrameChunk::trusted_new(frames)
-}
+// #[requires(frames.start_frame().less_than_equal(&frames.end_frame()))]
+// #[ensures(result.start_frame() == frames.start_frame())]
+// #[ensures(result.end_frame() == frames.end_frame())]
+// fn create_from_unmapped(frames: FrameRange) -> frame_chunk::FrameChunk {
+//     frame_chunk::FrameChunk::trusted_new(frames)
+// }
 
