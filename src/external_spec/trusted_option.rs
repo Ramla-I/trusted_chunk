@@ -5,20 +5,22 @@ use crate::external_spec::trusted_range_inclusive::*;
 
 #[extern_spec]
 impl<T: PartialEq + Copy> core::option::Option<T> {
-    #[pure]
-    #[ensures(matches!(*self, Some(_)) == result)]
-    pub fn is_some(&self) -> bool;
-
-    #[pure]
-    #[ensures(self.is_some() == !result)]
-    pub fn is_none(&self) -> bool;
-
     #[requires(self.is_some())]
-    #[ensures(result == peek_option(&self))]
+    #[ensures(old(self) === Some(result))]
     pub fn unwrap(self) -> T;
+    
+    #[pure]
+    #[ensures(result == matches!(self, None))]
+    #[ensures(self.is_some() == !result)]
+    pub const fn is_none(&self) -> bool;
 
-    #[ensures(result.is_some() ==> (old(self.is_some()) && old(peek_option(&self)) == peek_option(&result)))]
-    #[ensures(result.is_none() ==> old(self.is_none()))]
+    #[pure]
+    #[ensures(result == matches!(self, Some(_)))]
+    #[ensures(self.is_none() == !result)]
+    pub const fn is_some(&self) -> bool;
+
+    #[ensures(result === old(snap(self)))]
+    #[ensures(self.is_none())]
     pub fn take(&mut self) -> Option<T>;
 }
 

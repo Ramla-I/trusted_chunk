@@ -116,13 +116,13 @@ impl<T: UniqueCheck> StaticArray<T> {
     #[ensures(result.is_some() ==> {
             let idx = peek_option(&result);
             let range = peek_option(&self.arr[idx]);
-            range.range_overlaps(&elem)
+            range.overlaps(&elem)
         }
     )]
     #[ensures(result.is_none() ==> 
         forall(|i: usize| ((index <= i && i < self.arr.len()) && self.arr[i].is_some()) ==> {
             let range = peek_option(&self.arr[i]);
-            !range.range_overlaps(&elem)
+            !range.overlaps(&elem)
         })
     )]
     pub(crate) fn elem_overlaps_in_array(&self, elem: T, index: usize) -> Option<usize> {
@@ -132,7 +132,7 @@ impl<T: UniqueCheck> StaticArray<T> {
 
         let ret = match self.arr[index] {
             Some(val) => {
-                if val.range_overlaps(&elem) {
+                if val.overlaps(&elem) {
                     Some(index)
                 } else {
                     self.elem_overlaps_in_array(elem, index + 1)

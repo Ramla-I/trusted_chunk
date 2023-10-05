@@ -209,7 +209,7 @@ pub struct FrameRange(RangeInclusive<Frame>);
 impl UniqueCheck for FrameRange {
     #[pure]
     #[trusted]
-    fn range_overlaps(&self, other: &Self) -> bool {
+    fn overlaps(&self, other: &Self) -> bool {
         self.range_overlaps(other)
     }
 

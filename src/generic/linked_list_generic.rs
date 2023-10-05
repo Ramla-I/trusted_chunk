@@ -16,180 +16,165 @@ use crate::{
 };
 use core::{mem, marker::Copy, ops::Deref};
 
-
-pub struct List<T: UniqueCheck> {
+pub struct List<T> {
     head: Link<T>,
 }
 
-pub(crate) enum Link<T: UniqueCheck> {
-    Empty,
-    More(Box<Node<T>>)
-}
+type Link<T> = Option<Box<Node<T>>>;
 
-pub(crate) struct Node<T: UniqueCheck> {
+struct Node<T> {
     elem: T,
     next: Link<T>,
 }
 
-
-#[trusted]
-#[requires(src.is_empty())]
-#[ensures(dest.is_empty())]
-#[ensures(old(dest.len()) == result.len())]
-#[ensures(forall(|i: usize| (0 <= i && i < result.len()) ==> 
-                old(dest.lookup(i)) == result.lookup(i)))] 
-fn replace<T: UniqueCheck + Copy>(dest: &mut Link<T>, src: Link<T>) -> Link<T> {
-    mem::replace(dest, src)
-}
-
-
-impl<T: UniqueCheck + Copy> List<T> {
-
+impl<T> List<T> {
     #[pure]
     pub fn len(&self) -> usize {
-        self.head.len()
+        link_len(&self.head)
     }
 
-    /// Looks up an element in the list.
-    /// 
-    /// # Pre-conditions:
-    /// * index is less than the length
     #[pure]
-    #[requires(0 <= index && index < self.len())]
-    pub fn lookup(&self, index: usize) -> T where T: Copy {
-        self.head.lookup(index)
+    fn is_empty(&self) -> bool {
+        matches!(self.head, None)
     }
 
-    /// Creates an empty list.
-    /// 
-    /// # Post-conditions: 
-    /// * length is zero.
     #[ensures(result.len() == 0)]
-    pub const fn new() -> Self {
-        List { head: Link::Empty }
+    pub fn new() -> Self {
+        List { head: None }
     }
 
+    #[pure]
+    #[requires(index < self.len())]
+    pub fn lookup(&self, index: usize) -> &T {
+        link_lookup(&self.head, index)
+    }
 
-    /// Adds an element to the list.
-    /// 
-    /// # Post-conditions:
-    /// * new_length = old_length + 1
-    /// * `elem` is added at index 0
-    /// * all previous elements remain in the list, just moved one index forward
-    #[ensures(self.len() == old(self.len()) + 1)] 
-    #[ensures(self.lookup(0) == elem)]
-    #[ensures(forall(|i: usize| (1 <= i && i < self.len()) ==> old(self.lookup(i-1)) == self.lookup(i)))]
+    #[ensures(self.len() == old(self.len()) + 1)]
+    #[ensures(snap(self.lookup(0)) === elem)]
+    #[ensures(forall(|i: usize| (i < old(self.len())) ==>
+                 old(self.lookup(i)) === self.lookup(i + 1)))]
     pub fn push(&mut self, elem: T) {
         let new_node = Box::new(Node {
-            elem: elem,
-            next: replace(&mut self.head, Link::Empty)
+            elem,
+            next: self.head.take(),
         });
 
-        self.head = Link::More(new_node);
+        self.head = Some(new_node);
     }
 
-    /// A push function that ensures there is no overlap of list elements, given that the list originally has no overlaps.
-    /// 
-    /// # Pre-conditions:
-    /// * list elements do not overlap
-    /// 
-    /// # Post-conditions:
-    /// * If the push fails, than the returned index is less than the list length
-    /// * If the push fails, then `elem` overlaps with the element at the returned index
-    /// * If the push succeeds, then new_length = old_length + 1
-    /// * If the push succeeds, then `elem` is added at index 0
-    /// * If the push succeeds, then all previous elements remain in the list, just moved one index forward
-    /// * If the push succeeds, then list elements do not overlap
-    #[requires(forall(|i: usize, j: usize| (0 <= i && i < self.len() && 0 <= j && j < self.len()) ==> 
-        (i != j ==> !self.lookup(i).range_overlaps(&self.lookup(j))))
-    )]
-    #[ensures(result.is_err() ==> peek_err(&result) < self.len())]
-    #[ensures(result.is_err() ==> {
-            let idx = peek_err(&result);
-            let range = self.lookup(idx);
-            range.range_overlaps(&elem)
-        }
-    )]
-    #[ensures(result.is_ok() ==> self.len() == old(self.len()) + 1)] 
-    #[ensures(result.is_ok() ==> self.lookup(0) == elem)]
-    #[ensures(result.is_ok() ==> forall(|i: usize| (1 <= i && i < self.len()) ==> old(self.lookup(i-1)) == self.lookup(i)))]
-    #[ensures(forall(|i: usize, j: usize| (0 <= i && i < self.len() && 0 <= j && j < self.len()) ==> 
-        (i != j ==> !self.lookup(i).range_overlaps(&self.lookup(j))))
-    )]
-    pub fn push_unique_with_precond(&mut self, elem: T) -> Result<(),usize> {
-        match self.elem_overlaps_in_list(elem, 0) {
-            Some(idx) => Err(idx),
-            None => {
-                // let new_node = Box::new(Node {
-                //     elem: elem,
-                //     next: replace(&mut self.head, Link::Empty)
-                // });
-                // self.head = Link::More(new_node);
-                self.push(elem);
-                Ok(())
-            }
+
+    predicate! {
+        // two-state predicate to check if the head of a list was correctly removed
+        fn head_removed(&self, prev: &Self) -> bool {
+            self.len() == prev.len() - 1 // The length will decrease by 1
+            && forall(|i: usize| // Every element will be shifted forwards by one
+                (1 <= i && i < prev.len())
+                    ==> prev.lookup(i) === self.lookup(i - 1))
         }
     }
 
-    /// Removes element at index 0 from the list.
-    /// 
-    /// Post-conditions:
-    /// * if the list is empty, returns None.
-    /// * if the list is not empty, returns Some().
-    /// * if the list is empty, the length remains 0.
-    /// * if the list is not empty, new_length = old_length - 1
-    /// * if the list is not empty, the returned element was previously at index 0
-    /// * if the list is not empty, all elements in the old list at index [1..] are still in the list, except at one index less.
-    #[ensures(old(self.len()) == 0 ==> result.is_none())]
-    #[ensures(old(self.len()) > 0 ==> result.is_some())]
-    #[ensures(old(self.len()) == 0 ==> self.len() == 0)]
-    #[ensures(old(self.len()) > 0 ==> self.len() == old(self.len()-1))]
-    #[ensures(old(self.len()) > 0 ==> *peek_option_ref(&result) == old(self.lookup(0)))]
-    #[ensures(old(self.len()) > 0 ==>
-        forall(|i: usize| (0 <= i && i < self.len()) ==> old(self.lookup(i+1)) == self.lookup(i))
+    #[ensures(old(self.is_empty()) ==>
+        result.is_none() &&
+        self.is_empty()
     )]
-    pub fn pop(&mut self) -> Option<T> {
-        match replace(&mut self.head, Link::Empty) {
-            Link::Empty => {
-                None
-            }
-            Link::More(node) => {
+    #[ensures(!old(self.is_empty()) ==>
+        self.head_removed(&old(snap(self))) &&
+        result === Some(snap(old(snap(self)).lookup(0)))
+    )]
+    pub fn try_pop(&mut self) -> Option<T> {
+        match self.head.take() {
+            None => None,
+            Some(node) => {
                 self.head = node.next;
                 Some(node.elem)
             }
         }
     }
 
+    #[requires(!self.is_empty())]
+    #[ensures(self.head_removed(&old(snap(self))))]
+    #[ensures(result === old(snap(self)).lookup(0))]
+    pub fn pop(&mut self) -> T {
+        self.try_pop().unwrap()
+    }
 
-    /// Returns the index of the first element in the list, starting from `index`, which overlaps with `elem`.
-    /// Returns None if there is no overlap.
-    /// 
-    /// # Pre-conditions:
-    /// * index is less than or equal to the list length
-    /// 
-    /// # Post-conditions:
-    /// * if the result is Some(idx), then idx is less than the list's length.
-    /// * if the result is Some(idx), then the element at idx overlaps with `elem`
-    /// * if the result is None, then no element in the lists overlaps with `elem`
+    // // Not currently possible in Prusti
+    // pub fn try_peek(&self) -> Option<&T> {
+    //     todo!()
+    // }
+
+    #[pure]
+    #[requires(!self.is_empty())]
+    pub fn peek(&self) -> &T {
+        self.lookup(0)
+    }
+
+    #[trusted] // required due to unsupported reference in enum
+    #[requires(!self.is_empty())]
+    #[ensures(snap(result) === old(snap(self.peek())))]
+    #[after_expiry(
+        old(self.len()) === self.len() // (1. condition)
+        && forall(|i: usize| 1 <= i && i < self.len() // (2. condition)
+            ==> old(snap(self.lookup(i))) === snap(self.lookup(i)))
+        && snap(self.peek()) === before_expiry(snap(result)) // (3. condition)
+    )]
+    pub fn peek_mut(&mut self) -> &mut T {
+        // This does not work in Prusti at the moment:
+        // "&mut self.head" has type "&mut Option<T>"
+        // this gets auto-dereferenced by Rust into type: "Option<&mut T>"
+        // this then gets matched to "Some(node: &mut T)"
+        // References in enums are not yet supported, so this cannot be verified by Prusti
+        if let Some(node) = &mut self.head {
+            &mut node.elem
+        } else {
+            unreachable!()
+        }
+        // ...
+    }
+}
+
+#[pure]
+#[requires(index < link_len(link))]
+fn link_lookup<T>(link: &Link<T>, index: usize) -> &T {
+    match link {
+        Some(node) => {
+            if index == 0 {
+                &node.elem
+            } else {
+                link_lookup(&node.next, index - 1)
+            }
+        }
+        None => unreachable!(),
+    }
+}
+
+impl<T: UniqueCheck> List<T> {
+
+    #[pure]
+    #[requires(index < self.len())]
+    pub fn lookup_copy(&self, index: usize) -> T {
+        link_lookup_copy(&self.head, index)
+    }
+
     #[requires(0 <= index && index <= self.len())]
     #[ensures(result.is_some() ==> peek_option(&result) < self.len())]
     #[ensures(result.is_some() ==> {
             let idx = peek_option(&result);
-            let range = self.lookup(idx);
-            range.range_overlaps(&elem)
+            let range = self.lookup_copy(idx);
+            range.overlaps(&elem)
         }
     )]
     #[ensures(result.is_none() ==> 
         forall(|i: usize| (index <= i && i < self.len()) ==> {
-            let range = self.lookup(i);
-            !range.range_overlaps(&elem)
+            let range = self.lookup_copy(i);
+            !range.overlaps(&elem)
         })
     )]
     pub(crate) fn elem_overlaps_in_list(&self, elem: T, index: usize) -> Option<usize> {
         if index == self.len() {
             return None;
         }
-        let ret = if self.lookup(index).range_overlaps(&elem) {
+        let ret = if self.lookup_copy(index).overlaps(&elem) {
             Some(index)
         } else {
             self.elem_overlaps_in_list(elem, index + 1)
@@ -197,50 +182,62 @@ impl<T: UniqueCheck + Copy> List<T> {
         ret
     }
 
-}
 
-impl<T: UniqueCheck> Link<T> {
-
-    /// Recursive function that returns length of the list starting from this Link/ Node
-    /// 
-    /// # Post-conditions:
-    /// * returns 0 if the link is empty
-    /// * returns >0 if the link is not empty
-    #[pure]
-    #[ensures(self.is_empty() ==> result == 0)]
-    #[ensures(!self.is_empty() ==> result > 0)]
-    fn len(&self) -> usize {
-        match self {
-            Link::Empty => 0,
-            Link::More(box node) => 1 + node.next.len(),
+    #[requires(forall(|i: usize, j: usize| (0 <= i && i < self.len() && 0 <= j && j < self.len()) ==> 
+        (i != j ==> !self.lookup_copy(i).overlaps(&self.lookup_copy(j))))
+    )]
+    #[ensures(result.is_err() ==> peek_err(&result) < self.len())]
+    #[ensures(result.is_err() ==> {
+            let idx = peek_err(&result);
+            let range = self.lookup_copy(idx);
+            range.overlaps(&elem)
         }
-    }
-
-    #[pure]
-    fn is_empty(&self) -> bool {
-        match self {
-            Link::Empty => true,
-            Link::More(box node) => false,
-        }
-    }
-
-    /// Recursive function that returns the element at the given `index`.
-    /// 
-    /// # Pre-conditions:
-    /// * `index` is less than the list length
-    #[pure]
-    #[requires(0 <= index && index < self.len())]
-    pub fn lookup(&self, index: usize) -> T {
-        match self {
-            Link::Empty => unreachable!(),
-            Link::More(box node) => {
-                if index == 0 {
-                    node.elem
-                } else {
-                    node.next.lookup(index - 1)
-                }
+    )]
+    #[ensures(result.is_ok() ==> self.len() == old(self.len()) + 1)] 
+    #[ensures(result.is_ok() ==> snap(self.lookup(0)) === elem)]
+    #[ensures(result.is_ok() ==> self.lookup_copy(0) == elem)]
+    #[ensures(result.is_ok() ==> forall(|i: usize| (1 <= i && i < self.len()) ==> old(self.lookup_copy(i-1)) == self.lookup_copy(i)))]
+    #[ensures(result.is_ok() ==> {
+        forall(|i: usize| (1 <= i && i < self.len()) ==> !(self.lookup_copy(i).overlaps(&elem)))
+    })]
+    #[ensures(forall(|i: usize, j: usize| (0 <= i && i < self.len() && 0 <= j && j < self.len()) ==> 
+        (i != j ==> !self.lookup_copy(i).overlaps(&self.lookup_copy(j))))
+    )]
+    pub fn push_unique_with_precond(&mut self, elem: T) -> Result<(),usize> {
+        match self.elem_overlaps_in_list(elem, 0) {
+            Some(idx) => Err(idx),
+            None => {
+                let new_node = Box::new(Node {
+                    elem,
+                    next: self.head.take(),
+                });
+        
+                self.head = Some(new_node);
+                Ok(())
             }
         }
     }
+}
 
+#[pure]
+#[requires(index < link_len(link))]
+fn link_lookup_copy<T: UniqueCheck>(link: &Link<T>, index: usize) -> T {
+    match link {
+        Some(node) => {
+            if index == 0 {
+                node.elem
+            } else {
+                link_lookup_copy(&node.next, index - 1)
+            }
+        }
+        None => unreachable!(),
+    }
+}
+
+#[pure]
+fn link_len<T>(link: &Link<T>) -> usize {
+    match link {
+        None => 0,
+        Some(node) => 1 + link_len(&node.next),
+    }
 }
