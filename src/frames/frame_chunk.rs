@@ -8,11 +8,12 @@ use range_inclusive::*;
 use core::ops::{Deref, DerefMut};
 use crate::{
     *,
-    external_spec::{trusted_option::*, trusted_result::*},
-    frames::{ 
-        linked_list_frame::*, 
-        static_array_frame::*,
-        frame_range::*
+    external_spec::{trusted_option::*, trusted_result::*, partial_ord::*},
+    frames::frame_range::*,
+    generic::{
+        range_trait::UniqueCheck,
+        linked_list_generic::*,
+        static_array_generic::*
     }
 };
 
@@ -36,13 +37,13 @@ pub enum ChunkCreationError {
 /// linked list is used to bookkeep all further allocations.
 pub struct FrameChunkAllocator {
     pub(crate) heap_init: bool,
-    pub(crate) list: List,
-    pub(crate) array: StaticArray
+    pub(crate) list: List<FrameRange>,
+    pub(crate) array: StaticArray<FrameRange>
 }
 
 impl FrameChunkAllocator {
     /// Creates an allocator with empty bookkeeping structures
-    pub const fn new() -> FrameChunkAllocator {
+    pub fn new() -> FrameChunkAllocator {
         FrameChunkAllocator { heap_init: false, list: List::new(), array: StaticArray::new() }
     }
 
@@ -71,10 +72,10 @@ impl FrameChunkAllocator {
     #[ensures((old(self.heap_init) || old(self.list.len() != 0)) ==> result.is_err())]
     #[ensures(result.is_ok() ==> self.heap_init)]
     #[ensures(result.is_ok() ==> forall(|i: usize, j: usize| (0 <= i && i < self.list.len() && 0 <= j && j < self.list.len()) ==> 
-        (i != j ==> !self.list.lookup(i).range_overlaps(&self.list.lookup(j))))
+        (i != j ==> !self.list.lookup_copy(i).overlaps(&self.list.lookup_copy(j))))
     )]
     #[ensures(result.is_ok() ==> self.list.len() <= self.array.len())]
-    #[ensures(result.is_ok() ==>  forall(|i: usize| (0 <= i && i < self.list.len()) ==> peek_option(&self.array.arr[i]) == self.list.lookup(self.list.len() - 1 - i)))]
+    #[ensures(result.is_ok() ==>  forall(|i: usize| (0 <= i && i < self.list.len()) ==> peek_option(&self.array.arr[i]) === self.list.lookup_copy(self.list.len() - 1 - i)))]
     // #[ensures(forall(|i: usize| (self.list.len() <= i && i < self.array.arr.len()) ==> self.array.arr[i].is_none()))]
     pub fn switch_to_heap_allocated(&mut self) -> Result<(),()> {
         if self.heap_init || self.list.len() != 0 {
@@ -86,9 +87,9 @@ impl FrameChunkAllocator {
             body_invariant!(self.list.len() <= self.array.len());
             body_invariant!(self.list.len() == i);
             body_invariant!(forall(|j: usize| ((0 <= j && j < self.list.len()) ==> self.array.arr[j].is_some())));
-            body_invariant!(forall(|j: usize| ((0 <= j && j < self.list.len()) ==> peek_option(&self.array.arr[j]) == self.list.lookup(self.list.len() - 1 - j))));
+            body_invariant!(forall(|j: usize| ((0 <= j && j < self.list.len()) ==> peek_option(&self.array.arr[j]) == self.list.lookup_copy(self.list.len() - 1 - j))));
             body_invariant!(forall(|i: usize, j: usize| (0 <= i && i < self.list.len() && 0 <= j && j < self.list.len()) ==> 
-                (i != j ==> !self.list.lookup(i).range_overlaps(&self.list.lookup(j))))
+                (i != j ==> !self.list.lookup_copy(i).overlaps(&self.list.lookup_copy(j))))
             );
             body_invariant!(i < self.array.arr.len());
             body_invariant!(i >= 0);
@@ -137,8 +138,8 @@ impl FrameChunkAllocator {
     #[ensures(result.is_err() ==> {
         match peek_err(&result) {
             ChunkCreationError::Overlap(idx) => {
-                (self.heap_init && (idx < self.list.len()) & self.list.lookup(idx).range_overlaps(&chunk_range)) ||
-                (!self.heap_init && (idx < self.array.len()) && (self.array.lookup(idx).is_some()) && peek_option(&self.array.lookup(idx)).range_overlaps(&chunk_range))
+                (self.heap_init && (idx < self.list.len()) & self.list.lookup_copy(idx).overlaps(&chunk_range)) ||
+                (!self.heap_init && (idx < self.array.len()) && (self.array.lookup(idx).is_some()) && peek_option(&self.array.lookup(idx)).overlaps(&chunk_range))
             },
             _ => true
         }
@@ -148,20 +149,19 @@ impl FrameChunkAllocator {
         new_chunk.start() == *chunk_range.start() && new_chunk.end() == *chunk_range.end()
     })]
     #[ensures(result.is_ok() ==> {
-        (self.heap_init && forall(|i: usize| (0 <= i && i < old(self.list.len())) ==> !old(self.list.lookup(i)).range_overlaps(&chunk_range)))
+        (self.heap_init && forall(|i: usize| (0 <= i && i < old(self.list.len())) ==> !old(self.list.lookup_copy(i)).overlaps(&chunk_range)))
         ||
         (!self.heap_init && forall(|i: usize| (0 <= i && i < old(self.array.len())) && old(self.array.lookup(i)).is_some()
-            ==> !peek_option(&old(self.array.lookup(i))).range_overlaps(&chunk_range)))
+            ==> !peek_option(&old(self.array.lookup(i))).overlaps(&chunk_range)))
     })]
     #[ensures(result.is_ok() ==> {
-        (self.heap_init && self.list.len() >= 1 && self.list.lookup(0) == chunk_range)
+        (self.heap_init && self.list.len() >= 1 && snap(self.list.lookup(0)) === chunk_range)
         ||
         (!self.heap_init && {
             let idx = peek_result_ref(&result).1;
             idx < self.array.len() && self.array.lookup(idx).is_some() && peek_option(&self.array.lookup(idx)) == chunk_range
         })
     })]
-
     #[ensures(forall(|i: usize| (0 <= i && i < self.array.len() && self.array.arr[i].is_some()) ==> {
         forall(|j: usize| (0 <= j && j < i) ==> self.array.arr[j].is_some())
     }))]
@@ -215,20 +215,20 @@ impl FrameChunk {
         self.frames.is_empty()
     }
 
-    /// Creates a new `FrameChunk` with `chunk_range` if no other range in `chunk_list` overlaps with `chunk_range`
-    /// and adds the range of the newly created `FrameChunk` to `chunk_list`.
-    /// Returns an Err if there is an overlap, with the error value being the index in `chunk_list` of the element which overlaps with `frames`.
-    /// 
-    /// # Post-conditions:
-    /// * If it fails than there was an overlap with an existing chunk or an empty range was passed as an argument
-    /// * If it succeeds, then the newly created chunk has the same bounds as `chunk_range`
-    /// * If it succeeds, then `chunk_range` is added to the list
-    /// * If it succeeds, then the length of `chunk_list` has increased by 1
-    /// * If it succeeds, then all other elements in the `chunk_list` remain unchanged
-    /// * If it succeeds, then `chunk_range` did not overlap with any element in the old `chunk_list`
+    // /// Creates a new `FrameChunk` with `chunk_range` if no other range in `chunk_list` overlaps with `chunk_range`
+    // /// and adds the range of the newly created `FrameChunk` to `chunk_list`.
+    // /// Returns an Err if there is an overlap, with the error value being the index in `chunk_list` of the element which overlaps with `frames`.
+    // /// 
+    // /// # Post-conditions:
+    // /// * If it fails than there was an overlap with an existing chunk or an empty range was passed as an argument
+    // /// * If it succeeds, then the newly created chunk has the same bounds as `chunk_range`
+    // /// * If it succeeds, then `chunk_range` is added to the list
+    // /// * If it succeeds, then the length of `chunk_list` has increased by 1
+    // /// * If it succeeds, then all other elements in the `chunk_list` remain unchanged
+    // /// * If it succeeds, then `chunk_range` did not overlap with any element in the old `chunk_list`
     #[ensures(result.is_err() ==> {
         match peek_err(&result) {
-            ChunkCreationError::Overlap(idx) => (idx < chunk_list.len()) & chunk_list.lookup(idx).range_overlaps(&chunk_range),
+            ChunkCreationError::Overlap(idx) => (idx < chunk_list.len()) && chunk_list.lookup_copy(idx).overlaps(&chunk_range),
             _ => true
         }
     })]
@@ -237,22 +237,24 @@ impl FrameChunk {
         new_chunk.start() == *chunk_range.start() && new_chunk.end() == *chunk_range.end()
     })]
     #[ensures(result.is_ok() ==> {
-        chunk_list.len() >= 1 && chunk_list.lookup(0) == chunk_range
+        chunk_list.len() >= 1 && snap(chunk_list.lookup(0)) === &chunk_range
     })]
     #[ensures(result.is_ok() ==> chunk_list.len() == old(chunk_list.len()) + 1)] 
     #[ensures(result.is_ok() ==> {
-        forall(|i: usize| (1 <= i && i < chunk_list.len()) ==> old(chunk_list.lookup(i-1)) == chunk_list.lookup(i))
+        forall(|i: usize| (1 <= i && i < chunk_list.len()) ==> old(chunk_list.lookup(i-1)) === chunk_list.lookup(i))
     })]
     #[ensures(result.is_ok() ==> {
-        forall(|i: usize| (0 <= i && i < old(chunk_list.len())) ==> !old(chunk_list.lookup(i)).range_overlaps(&chunk_range))
+        forall(|i: usize| (0 <= i && i < old(chunk_list.len())) ==> !old(&chunk_list.lookup_copy(i)).overlaps(&chunk_range))
     })]
-    fn new(chunk_range: FrameRange, chunk_list: &mut List) -> Result<FrameChunk, ChunkCreationError> {
+    fn new(chunk_range: FrameRange, chunk_list: &mut List<FrameRange>) -> Result<FrameChunk, ChunkCreationError> {
         if chunk_range.is_empty() {
             return Err(ChunkCreationError::InvalidRange);
         }
 
         let overlap_idx = chunk_list.elem_overlaps_in_list(chunk_range, 0);
         if overlap_idx.is_some(){
+            let idx = peek_option(&overlap_idx);
+            prusti_assert!(chunk_list.lookup_copy(idx).overlaps(&chunk_range));
             Err(ChunkCreationError::Overlap(overlap_idx.unwrap()))
         } else {
             chunk_list.push(chunk_range);
@@ -284,7 +286,7 @@ impl FrameChunk {
     }))]
     #[ensures(result.is_err() ==> {
         match peek_err(&result) {
-            ChunkCreationError::Overlap(idx) => (idx < chunk_list.len()) && (chunk_list.lookup(idx).is_some()) && peek_option(&chunk_list.lookup(idx)).range_overlaps(&chunk_range),
+            ChunkCreationError::Overlap(idx) => (idx < chunk_list.len()) && (chunk_list.lookup(idx).is_some()) && peek_option(&chunk_list.lookup(idx)).overlaps(&chunk_range),
             _ => true
         }
     })]
@@ -301,7 +303,7 @@ impl FrameChunk {
     )] 
     #[ensures(result.is_ok() ==> 
         forall(|i: usize| ((0 <= i && i < chunk_list.len()) ) && old(chunk_list.lookup(i)).is_some()
-            ==> !peek_option(&old(chunk_list.lookup(i))).range_overlaps(&chunk_range))
+            ==> !peek_option(&old(chunk_list.lookup(i))).overlaps(&chunk_range))
     )] 
     #[ensures(forall(|i: usize| (0 <= i && i < chunk_list.arr.len() && chunk_list.arr[i].is_some()) ==> {
         forall(|j: usize| (0 <= j && j < i) ==> chunk_list.arr[j].is_some())
@@ -309,7 +311,7 @@ impl FrameChunk {
     #[ensures(forall(|i: usize| (0 <= i && i < chunk_list.arr.len() && chunk_list.arr[i].is_none()) ==> {
         forall(|j: usize| (i <= j && j < chunk_list.arr.len()) ==> chunk_list.arr[j].is_none())
     }))]
-    fn new_pre_heap(chunk_range: FrameRange, chunk_list: &mut StaticArray) -> Result<(FrameChunk, usize), ChunkCreationError> {
+    fn new_pre_heap(chunk_range: FrameRange, chunk_list: &mut StaticArray<FrameRange>) -> Result<(FrameChunk, usize), ChunkCreationError> {
         if chunk_range.is_empty() {
             return Err(ChunkCreationError::InvalidRange);
         }
@@ -328,7 +330,7 @@ impl FrameChunk {
     /// Private function that creates a chunk without any checks.
     /// 
     /// Only used within other verified functions, or registered as a callback
-    #[requires(frames.start_frame().less_than_equal(&frames.end_frame()))]
+    #[requires(frames.start_frame() <= frames.end_frame())]
     #[ensures(result.start() == frames.start_frame())]
     #[ensures(result.end() == frames.end_frame())]
     pub(crate) fn trusted_new(frames: FrameRange) -> FrameChunk {
@@ -336,7 +338,7 @@ impl FrameChunk {
     }
 
 
-    /// Splits a chunk into 1-3 chunks, depending on where the split is at.
+    /// Splits a range into 1-3 ranges, depending on where the split is at.
     /// It is formally verified that the resulting chunks are disjoint, contiguous and their start/end is equal to that of the original chunk.
     /// 
     /// # Post-conditions:
@@ -347,13 +349,13 @@ impl FrameChunk {
     #[ensures(result.is_ok() ==> {
         let split_range = peek_result_ref(&result);
         ((split_range.0).is_some() ==> !peek_option_ref(&split_range.0).range_overlaps(&split_range.1)) 
-        && ((split_range.2).is_some() ==> !split_range.1.range_overlaps(&peek_option_ref(&split_range.2)))
-        && (((split_range.0).is_some() && (split_range.2).is_some()) ==> !peek_option_ref(&split_range.0).range_overlaps(&peek_option_ref(&split_range.2)))
+        && ((split_range.2).is_some() ==> !split_range.1.range_overlaps(peek_option_ref(&split_range.2).deref()))
+        && (((split_range.0).is_some() && (split_range.2).is_some()) ==> !peek_option_ref(&split_range.0).range_overlaps(peek_option_ref(&split_range.2).deref()))
     })]
     #[ensures(result.is_ok() ==> {
         let split_range = peek_result_ref(&result);
-        ((split_range.0).is_some() ==> peek_option_ref(&split_range.0).end_frame() == split_range.1.start_frame().minus(1))
-        && ((split_range.2).is_some() ==> peek_option_ref(&split_range.2).start_frame() == split_range.1.end_frame().plus(1))
+        ((split_range.0).is_some() ==> peek_option_ref(&split_range.0).end_frame() == split_range.1.start_frame() - 1)
+        && ((split_range.2).is_some() ==> peek_option_ref(&split_range.2).start_frame() == split_range.1.end_frame() + 1)
     })]
     #[ensures(result.is_ok() ==> {
         let split_range = peek_result_ref(&result);
@@ -421,7 +423,7 @@ impl FrameChunk {
         let split_range = peek_result_ref(&result);
         (!split_range.0.is_empty() && !split_range.1.is_empty()) ==> (
             split_range.0.start_frame() == self.start_frame() 
-            && split_range.0.end_frame() == at_frame.minus(1) 
+            && split_range.0.end_frame() == at_frame - 1
             && split_range.1.start_frame() == at_frame 
             && split_range.1.end_frame() == self.end_frame()
         )
@@ -450,9 +452,9 @@ impl FrameChunk {
     /// or `self`s end has been updated to `other`'s end
     /// * If it fails, then `self` remains unchanged and `other` is returned
     #[ensures(result.is_ok() ==> 
-        (old(self.start_frame()) == other.end_frame().plus(1) && self.start_frame() == other.start_frame() && self.end_frame() == old(self.end_frame())) 
+        (old(self.start_frame()) == other.end_frame() + 1 && self.start_frame() == other.start_frame() && self.end_frame() == old(self.end_frame())) 
         || 
-        (old(self.end_frame()).plus(1) == other.start_frame() && self.end_frame() == other.end_frame() && self.start_frame() == old(self.start_frame()))
+        (old(self.end_frame()) + 1 == other.start_frame() && self.end_frame() == other.end_frame() && self.start_frame() == old(self.start_frame()))
     )]
     #[ensures(result.is_err() ==> {
         let chunk = peek_err_ref(&result);

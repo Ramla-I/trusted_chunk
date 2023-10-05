@@ -10,20 +10,21 @@ use core::ops::{Deref, DerefMut, Add, Sub};
 use core::cmp::{PartialOrd, Ord, Ordering};
 use crate::{
     *,
-    external_spec::{trusted_option::*, trusted_result::*},
-    // spec::{pagerange_spec::*},
+    external_spec::{trusted_option::*, trusted_result::*, partial_ord::*},
+    generic::range_trait::*,
 };
 
 pub(crate) const MAX_VIRTUAL_ADDRESS: usize = usize::MAX;
+pub(crate) const MAX_PAGE_NUMBER: usize = MAX_VIRTUAL_ADDRESS / PAGE_SIZE;
 pub(crate) const PAGE_SIZE: usize = 4096;
 
-//Prusti error: Unsupported constant type
-pub(crate) const MIN_PAGE: Page = Page { number: 0 };
-//Prusti error: Unsupported constant type
-pub(crate) const MAX_PAGE: Page = Page { number: 0xFF_FFFF_FFFF }; // usize::MAX & 0x000F_FFFF_FFFF_FFFF / PAGE_SIZE
+// //Prusti error: Unsupported constant type
+// pub(crate) const MIN_FRAME: Page = Page { number: 0 };
+// //Prusti error: Unsupported constant type
+// pub(crate) const MAX_FRAME: Page = Page { number: 0xFF_FFFF_FFFF }; // usize::MAX & 0x000F_FFFF_FFFF_FFFF / PAGE_SIZE
 
-pub(crate) const MIN_PAGE_NUMBER: usize = 0;
-pub(crate) const MAX_PAGE_NUMBER: usize = 0xFF_FFFF_FFFF; // usize::MAX & 0x000F_FFFF_FFFF_FFFF / PAGE_SIZE
+pub(crate) const MIN_FRAME_NUMBER: usize = 0;
+pub(crate) const MAX_FRAME_NUMBER: usize = 0xFF_FFFF_FFFF; // usize::MAX & 0x000F_FFFF_FFFF_FFFF / PAGE_SIZE
 
 
 #[pure]
@@ -38,12 +39,12 @@ fn max(a: usize, b: usize) -> usize {
 
 #[pure]
 fn min_page(a: Page, b: Page) -> Page {
-    if a.less_than(&b) { a } else { b }
+    if a < b { a } else { b }
 }
 
 #[pure]
 fn max_page(a: Page, b: Page) -> Page {
-    if a.greater_than(&b) { a } else { b }
+    if a > b { a } else { b }
 }
 
 #[pure]
@@ -81,62 +82,41 @@ impl Deref for Page {
 }
 
 #[extern_spec]
-impl PartialEq for Page {
-    #[pure]
-    #[ensures(result == (self.number == other.number))]
-    fn eq(&self, other: &Self) -> bool;
-}
-
-// #[extern_spec]
-// impl PartialOrd for usize {
-//     #[pure]
-//     fn partial_cmp(&self, other: &Self) -> Option<Ordering>;
-// }
-
-#[extern_spec]
 impl PartialOrd for Page {
     #[pure]
     #[ensures(result == self.number.partial_cmp(&other.number))]
     fn partial_cmp(&self, other: &Self) -> Option<Ordering>;
-
-    // Uncommenting these leads to an unexpected panic in Prusti
-    // but without these can't use comparison operators for pages in pure functions.
-    
-    // #[pure]
-    // #[ensures(result == (self.number < other.number))]
-    // fn lt(&self, other: &Self) -> bool;
-
-    // #[pure]
-    // #[ensures(result == (self.number <= other.number))]
-    // fn le(&self, other: &Self) -> bool;
-    
-    // #[pure]
-    // #[ensures(result == (self.number > other.number))]
-    // fn gt(&self, other: &Self) -> bool;
-    
-    // #[pure]
-    // #[ensures(result == (self.number >= other.number))]
-    // fn ge(&self, other: &Self) -> bool;
 }
 
+#[refine_trait_spec]
 impl Add<usize> for Page {
     type Output = Page;
+    #[pure]
+    #[trusted]
+    #[ensures(result.number == min(MAX_FRAME_NUMBER, saturating_add(self.number, rhs)))]
+    #[ensures(result >= self)]
+    #[ensures(rhs == 0 ==> result == self)]
     fn add(self, rhs: usize) -> Page {
         Page {
-            number: min(MAX_PAGE_NUMBER, self.number.saturating_add(rhs)),
+            number: min(MAX_FRAME_NUMBER, saturating_add(self.number, rhs)),
         }
     }
 }
 
+#[refine_trait_spec]
 impl Sub<usize> for Page {
     type Output = Page;
+    #[pure]
+    #[trusted]
+    #[ensures(result.number == saturating_sub(self.number, rhs))]
+    #[ensures(result <= self)]
+    #[ensures(rhs == 0 ==> result == self)]
     fn sub(self, rhs: usize) -> Page {
         Page {
-            number: self.number.saturating_sub(rhs),
+            number: saturating_sub(self.number, rhs),
         }
     }
 }
-
 impl Page {
     #[pure]
     pub const fn number(&self) -> usize {
@@ -144,65 +124,19 @@ impl Page {
     }
 }
 
-// The newly added methods for Page required for verification
-impl Page {
-    #[pure]
-    #[trusted]
-    #[ensures(result.number == min(MAX_PAGE_NUMBER, saturating_add(self.number, rhs)))]
-    #[ensures(result.greater_than_equal(&self))]
-    #[ensures(rhs == 0 ==> result == self)]
-    pub fn plus(self, rhs: usize) -> Self {
-        self + rhs
-    }
-
-    #[pure]
-    #[trusted]
-    #[ensures(result.number == saturating_sub(self.number, rhs))]
-    #[ensures(result.less_than_equal(&self))]
-    #[ensures(rhs == 0 ==> result == self)]
-    pub fn minus(self, rhs: usize) -> Self {
-        self - rhs
-    }
-
-    #[pure]
-    #[trusted]
-    #[ensures(result == (self.number < rhs.number))]
-    #[ensures(!result ==> self.greater_than_equal(&rhs))]
-    pub fn less_than(self, rhs: &Self) -> bool {
-        self < *rhs
-    }
-
-    #[pure]
-    #[trusted]
-    #[ensures(result == (self.number <= rhs.number))]
-    #[ensures(!result ==> self.greater_than(&rhs))]
-    pub fn less_than_equal(self, rhs: &Self) -> bool {
-        self <= *rhs
-    }
-
-    #[pure]
-    #[trusted]
-    #[ensures(result == (self.number > rhs.number))]
-    #[ensures(!result ==> self.less_than_equal(&rhs))]
-    pub fn greater_than(self, rhs: &Self) -> bool {
-        self > *rhs
-    }
-
-    #[pure]
-    #[trusted]
-    #[ensures(result == (self.number >= rhs.number))]
-    #[ensures(!result ==> self.less_than(&rhs))]
-    pub fn greater_than_equal(self, rhs: &Self) -> bool {
-        self >= *rhs
-    }
-}
-
-
 /// A struct representing an unallocated region in memory.
 /// Its functions are formally verified to prevent range overlaps between chunks.
 // #[cfg_attr(not(prusti), derive(Debug))]
 #[derive(Copy, Clone, PartialEq, Eq)]
 pub struct PageRange(RangeInclusive<Page>);
+
+impl UniqueCheck for PageRange {
+    #[pure]
+    #[trusted]
+    fn overlaps(&self, other: &Self) -> bool {
+        self.range_overlaps(other)
+    }
+}
 
 impl PageRange {
     #[ensures(result.start_page() == start)]
@@ -211,6 +145,7 @@ impl PageRange {
         PageRange(RangeInclusive::new(start, end))
     }
 
+    #[trusted] // otherwise use constructor with spec
     #[ensures(result.is_empty())]
     pub const fn empty() -> PageRange {
         PageRange( RangeInclusive::new(Page{ number: 1 }, Page{ number: 0 }) )
@@ -234,10 +169,10 @@ impl PageRange {
     }
 
     #[pure]
-    #[ensures(result == (self.start_page().greater_than(&self.end_page())))]
-    #[ensures(result == !(self.start_page().less_than_equal(&self.end_page())))]
+    #[ensures(result == (self.start_page() > self.end_page()))]
+    #[ensures(result == !(self.start_page() <= self.end_page()))]
     pub fn is_empty(&self) -> bool {
-        !(self.start_page().less_than_equal(&self.end_page()))
+        !(self.start_page() <= self.end_page())
     }
 
     #[pure]
@@ -246,21 +181,21 @@ impl PageRange {
     #[ensures({
         let starts = max_page(self.start_page(), other.start_page());
         let ends   = min_page(self.end_page(), other.end_page());
-        result == starts.less_than_equal(&ends) 
+        result == (starts <= ends) 
    })]
     /// Returning a PageRange here requires use to set the RangeInclusive new function as pure which
     /// requires Idx to be Copy, so just return bool.
     pub fn range_overlaps(&self, other: &PageRange) -> bool {
         let starts = max_page(self.start_page(), other.start_page());
         let ends   = min_page(self.end_page(), other.end_page());
-        starts.less_than_equal(&ends)
+        starts <= ends
     }
 
     #[pure]
     pub fn contains_range(&self, other: &PageRange) -> bool {
         !other.is_empty()
-        && (other.start_page().greater_than_equal(&self.start_page()))
-        && (other.end_page().less_than_equal(&self.end_page()))
+        && (other.start_page() >= self.start_page())
+        && (other.end_page() <= self.end_page())
     }
 
     /// Splits a range into 1-3 ranges, depending on where the split is at.
@@ -279,50 +214,52 @@ impl PageRange {
     })]
     #[ensures(result.is_ok() ==> {
         let split_range = peek_result_ref(&result);
-        ((split_range.0).is_some() ==> peek_option_ref(&split_range.0).end_page() == split_range.1.start_page().minus(1))
-        && ((split_range.2).is_some() ==> peek_option_ref(&split_range.2).start_page() == split_range.1.end_page().plus(1))
+        ((split_range.0).is_some() ==> peek_option_ref(&split_range.0).end_page() == split_range.1.start_page() - 1)
+        && ((split_range.2).is_some() ==> peek_option_ref(&split_range.2).start_page() == split_range.1.end_page() + 1)
     })]
     #[ensures(result.is_ok() ==> {
         let split_range = peek_result_ref(&result);
         ((split_range.0).is_some() ==> peek_option_ref(&split_range.0).start_page() == self.start_page())
-        && ((split_range.0).is_none() ==> (split_range.1.start_page() == self.start_page() || (split_range.1.start_page().number == MIN_PAGE_NUMBER)))
+        && ((split_range.0).is_none() ==> (split_range.1.start_page() == self.start_page() || (split_range.1.start_page().number == MIN_FRAME_NUMBER)))
         && ((split_range.2).is_some() ==> peek_option_ref(&split_range.2).end_page() == self.end_page())
-        && ((split_range.2).is_none() ==> ((split_range.1.end_page() == self.end_page()) || (split_range.1.end_page().number == MAX_PAGE_NUMBER)))
+        && ((split_range.2).is_none() ==> ((split_range.1.end_page() == self.end_page()) || (split_range.1.end_page().number == MAX_FRAME_NUMBER)))
     })]
     #[ensures(result.is_err() ==> {
         let orig_range = peek_err_ref(&result);
         (orig_range.start_page() == self.start_page()) && (orig_range.end_page() == self.end_page())
     })]
-    pub fn split_range(self, pages_to_extract: PageRange) -> Result<(Option<PageRange>, PageRange, Option<PageRange>), PageRange> {
-        let min_page = Page { number: MIN_PAGE_NUMBER };
-        let max_page = Page { number: MAX_PAGE_NUMBER };
+    pub fn split_range(self, frames_to_extract: PageRange) -> Result<(Option<PageRange>, PageRange, Option<PageRange>), PageRange> {
+        let min_page = Page { number: MIN_FRAME_NUMBER };
+        let max_page = Page { number: MAX_FRAME_NUMBER };
 
-        if !self.contains_range(&pages_to_extract) {
+        if !self.contains_range(&frames_to_extract) {
             return Err(self);
         }
 
-        let start_page = pages_to_extract.start_page();
-        let end_page = pages_to_extract.end_page();
-
+        let start_page = frames_to_extract.start_page();
+        let end_page = frames_to_extract.end_page();
+        
         let before_start = if start_page == min_page || start_page == self.start_page() {
             None
         } else {
-            Some(PageRange::new(self.start_page(), start_page.minus(1)))
+            let a = PageRange::new(self.start_page(), start_page - 1);
+            Some(a)
+
         };
-
-        let start_to_end = pages_to_extract;
-
+        
+        let start_to_end = frames_to_extract;
+        
         let after_end = if end_page == max_page || end_page == self.end_page() {
             None
         } else {
-            Some(PageRange::new(end_page.plus(1), self.end_page())) 
+            Some(PageRange::new(end_page + 1, self.end_page())) 
         };
 
         Ok((before_start, start_to_end, after_end))
     }
 
 
-    /// Splits a chunk into 2 chunks at the page with number `at_page`.
+    /// Splits a chunk into 2 chunks at the frame with number `at_frame`.
     /// It is formally verified that the resulting chunks are disjoint, contiguous and their start/end is equal to that of the original chunk.
     /// 
     /// # Post-conditions:
@@ -349,8 +286,8 @@ impl PageRange {
         let split_range = peek_result_ref(&result);
         (!split_range.0.is_empty() && !split_range.1.is_empty()) ==> (
             split_range.0.start_page() == self.start_page() 
-            && split_range.0.end_page() == at_page.minus(1) 
-            && split_range.1.start_page() == at_page 
+            && split_range.0.end_page() == at_frame - 1
+            && split_range.1.start_page() == at_frame 
             && split_range.1.end_page() == self.end_page()
         )
     })]
@@ -358,25 +295,25 @@ impl PageRange {
         let orig_chunk = peek_err_ref(&result);
         (orig_chunk.start_page() == self.start_page()) && (orig_chunk.end_page() == self.end_page())
     })]
-    pub fn split_at(mut self, at_page: Page) -> Result<(Self, Self), Self> {
+    pub fn split_at(mut self, at_frame: Page) -> Result<(Self, Self), Self> {
         if self.is_empty() {
             return Err(self);
         }
-        let end_of_first = at_page.minus(1);
+        let end_of_first = at_frame - 1;
 
-        let (first, second) = if at_page == self.start_page() && at_page.less_than_equal(&self.end_page()) {
+        let (first, second) = if (at_frame == self.start_page()) && (at_frame <= self.end_page()) {
             let first  = PageRange::empty();
-            let second = PageRange::new(at_page, self.end_page());
+            let second = PageRange::new(at_frame, self.end_page());
             (first, second)
         } 
-        else if at_page == self.end_page().plus(1) && end_of_first.greater_than_equal(&self.start_page()) {
+        else if (at_frame == self.end_page() + 1) && (end_of_first >= self.start_page()) {
             let first  = PageRange::new(self.start_page(), self.end_page()); 
             let second = PageRange::empty();
             (first, second)
         }
-        else if at_page.greater_than(&self.start_page()) && end_of_first.less_than_equal(&self.end_page()) {
+        else if (at_frame > self.start_page()) && (end_of_first <= self.end_page()) {
             let first  = PageRange::new(self.start_page(), end_of_first);
-            let second = PageRange::new(at_page, self.end_page());
+            let second = PageRange::new(at_frame, self.end_page());
             (first, second)
         }
         else {
@@ -395,9 +332,9 @@ impl PageRange {
     /// or `self`s end has been updated to `other`'s end
     /// * If it fails, then `self` remains unchanged and `other` is returned
     #[ensures(result.is_ok() ==> 
-        (old(self.start_page()) == other.end_page().plus(1) && self.start_page() == other.start_page() && self.end_page() == old(self.end_page())) 
+        (old(self.start_page()) == other.end_page() + 1 && self.start_page() == other.start_page() && self.end_page() == old(self.end_page())) 
         || 
-        (old(self.end_page()).plus(1) == other.start_page() && self.end_page() == other.end_page() && self.start_page() == old(self.start_page()))
+        (old(self.end_page()) + 1 == other.start_page() && self.end_page() == other.end_page() && self.start_page() == old(self.start_page()))
     )]
     #[ensures(result.is_err() ==> {
         let chunk = peek_err_ref(&result);
@@ -411,11 +348,11 @@ impl PageRange {
             return Err(other);
         }
 
-        if self.start_page() == other.end_page().plus(1) {
+        if self.start_page() == (other.end_page() + 1) {
             // `other` comes contiguously before `self`
             *self = PageRange::new(other.start_page(), self.end_page());
         } 
-        else if self.end_page().plus(1) == other.start_page() {
+        else if (self.end_page() + 1) == other.start_page() {
             // `self` comes contiguously before `other`
             *self = PageRange::new(self.start_page(), other.end_page());
         }

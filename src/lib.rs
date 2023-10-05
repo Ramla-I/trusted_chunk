@@ -10,16 +10,10 @@ extern crate prusti_contracts;
 extern crate cfg_if;
 extern crate core;
 
-pub(crate) mod spec;
-pub(crate) mod external_spec;
-// pub mod linked_list;
-// pub mod static_array;
-// pub mod trusted_chunk;
-// mod test;
-// mod frames;
-// mod pages;
+mod external_spec;
 mod generic;
-mod frames_generic;
+mod frames;
+mod pages;
 
 cfg_if::cfg_if! {
 if #[cfg(prusti)] {

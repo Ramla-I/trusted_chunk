@@ -11,17 +11,17 @@ use core::cmp::{PartialOrd, Ord, Ordering};
 use crate::{
     *,
     external_spec::{trusted_option::*, trusted_result::*},
-    // spec::{framerange_spec::*},
+    generic::range_trait::*,
 };
 
 pub(crate) const MAX_VIRTUAL_ADDRESS: usize = usize::MAX;
 pub(crate) const MAX_PAGE_NUMBER: usize = MAX_VIRTUAL_ADDRESS / PAGE_SIZE;
 pub(crate) const PAGE_SIZE: usize = 4096;
 
-//Prusti error: Unsupported constant type
-pub(crate) const MIN_FRAME: Frame = Frame { number: 0 };
-//Prusti error: Unsupported constant type
-pub(crate) const MAX_FRAME: Frame = Frame { number: 0xFF_FFFF_FFFF }; // usize::MAX & 0x000F_FFFF_FFFF_FFFF / PAGE_SIZE
+// //Prusti error: Unsupported constant type
+// pub(crate) const MIN_FRAME: Frame = Frame { number: 0 };
+// //Prusti error: Unsupported constant type
+// pub(crate) const MAX_FRAME: Frame = Frame { number: 0xFF_FFFF_FFFF }; // usize::MAX & 0x000F_FFFF_FFFF_FFFF / PAGE_SIZE
 
 pub(crate) const MIN_FRAME_NUMBER: usize = 0;
 pub(crate) const MAX_FRAME_NUMBER: usize = 0xFF_FFFF_FFFF; // usize::MAX & 0x000F_FFFF_FFFF_FFFF / PAGE_SIZE
@@ -39,12 +39,12 @@ fn max(a: usize, b: usize) -> usize {
 
 #[pure]
 fn min_frame(a: Frame, b: Frame) -> Frame {
-    if a.less_than(&b) { a } else { b }
+    if a < b { a } else { b }
 }
 
 #[pure]
 fn max_frame(a: Frame, b: Frame) -> Frame {
-    if a.greater_than(&b) { a } else { b }
+    if a > b { a } else { b }
 }
 
 #[pure]
@@ -82,128 +82,60 @@ impl Deref for Frame {
 }
 
 #[extern_spec]
-impl PartialEq for Frame {
-    #[pure]
-    #[ensures(result == (self.number == other.number))]
-    fn eq(&self, other: &Self) -> bool;
-}
-
-#[extern_spec]
-impl PartialOrd for usize {
-    #[pure]
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering>;
-}
-
-#[extern_spec]
 impl PartialOrd for Frame {
     #[pure]
     #[ensures(result == self.number.partial_cmp(&other.number))]
     fn partial_cmp(&self, other: &Self) -> Option<Ordering>;
-
-    // Uncommenting these leads to an unexpected panic in Prusti
-    // but without these can't use comparison operators for frames in pure functions.
-    
-    // #[pure]
-    // #[ensures(result == (self.number < other.number))]
-    // fn lt(&self, other: &Self) -> bool;
-
-    // #[pure]
-    // #[ensures(result == (self.number <= other.number))]
-    // fn le(&self, other: &Self) -> bool;
-    
-    // #[pure]
-    // #[ensures(result == (self.number > other.number))]
-    // fn gt(&self, other: &Self) -> bool;
-    
-    // #[pure]
-    // #[ensures(result == (self.number >= other.number))]
-    // fn ge(&self, other: &Self) -> bool;
 }
 
+#[refine_trait_spec]
 impl Add<usize> for Frame {
     type Output = Frame;
+    #[pure]
+    #[trusted]
+    #[ensures(result.number == min(MAX_FRAME_NUMBER, saturating_add(self.number, rhs)))]
+    #[ensures(result >= self)]
+    #[ensures(rhs == 0 ==> result == self)]
     fn add(self, rhs: usize) -> Frame {
         Frame {
-            number: min(MAX_FRAME_NUMBER, self.number.saturating_add(rhs)),
+            number: min(MAX_FRAME_NUMBER, saturating_add(self.number, rhs)),
         }
     }
 }
 
+#[refine_trait_spec]
 impl Sub<usize> for Frame {
     type Output = Frame;
+    #[pure]
+    #[trusted]
+    #[ensures(result.number == saturating_sub(self.number, rhs))]
+    #[ensures(result <= self)]
+    #[ensures(rhs == 0 ==> result == self)]
     fn sub(self, rhs: usize) -> Frame {
         Frame {
-            number: self.number.saturating_sub(rhs),
+            number: saturating_sub(self.number, rhs),
         }
     }
 }
-
 impl Frame {
     #[pure]
     pub const fn number(&self) -> usize {
         self.number
     }
 }
-
-// The newly added methods for Frame required for verification
-impl Frame {
-    #[pure]
-    #[trusted]
-    #[ensures(result.number == min(MAX_FRAME_NUMBER, saturating_add(self.number, rhs)))]
-    #[ensures(result.greater_than_equal(&self))]
-    #[ensures(rhs == 0 ==> result == self)]
-    pub fn plus(self, rhs: usize) -> Self {
-        self + rhs
-    }
-
-    #[pure]
-    #[trusted]
-    #[ensures(result.number == saturating_sub(self.number, rhs))]
-    #[ensures(result.less_than_equal(&self))]
-    #[ensures(rhs == 0 ==> result == self)]
-    pub fn minus(self, rhs: usize) -> Self {
-        self - rhs
-    }
-
-    #[pure]
-    #[trusted]
-    #[ensures(result == (self.number < rhs.number))]
-    #[ensures(!result ==> self.greater_than_equal(&rhs))]
-    pub fn less_than(self, rhs: &Self) -> bool {
-        self < *rhs
-    }
-
-    #[pure]
-    #[trusted]
-    #[ensures(result == (self.number <= rhs.number))]
-    #[ensures(!result ==> self.greater_than(&rhs))]
-    pub fn less_than_equal(self, rhs: &Self) -> bool {
-        self <= *rhs
-    }
-
-    #[pure]
-    #[trusted]
-    #[ensures(result == (self.number > rhs.number))]
-    #[ensures(!result ==> self.less_than_equal(&rhs))]
-    pub fn greater_than(self, rhs: &Self) -> bool {
-        self > *rhs
-    }
-
-    #[pure]
-    #[trusted]
-    #[ensures(result == (self.number >= rhs.number))]
-    #[ensures(!result ==> self.less_than(&rhs))]
-    pub fn greater_than_equal(self, rhs: &Self) -> bool {
-        self >= *rhs
-    }
-}
-
-
 /// A struct representing an unallocated region in memory.
 /// Its functions are formally verified to prevent range overlaps between chunks.
 // #[cfg_attr(not(prusti), derive(Debug))]
 #[derive(Copy, Clone, PartialEq, Eq)]
 pub struct FrameRange(RangeInclusive<Frame>);
+
+impl UniqueCheck for FrameRange {
+    #[pure]
+    #[trusted]
+    fn overlaps(&self, other: &Self) -> bool {
+        self.range_overlaps(other)
+    }
+}
 
 impl FrameRange {
     #[ensures(result.start_frame() == start)]
@@ -212,6 +144,7 @@ impl FrameRange {
         FrameRange(RangeInclusive::new(start, end))
     }
 
+    #[trusted] // otherwise use constructor with spec
     #[ensures(result.is_empty())]
     pub const fn empty() -> FrameRange {
         FrameRange( RangeInclusive::new(Frame{ number: 1 }, Frame{ number: 0 }) )
@@ -235,10 +168,10 @@ impl FrameRange {
     }
 
     #[pure]
-    #[ensures(result == (self.start_frame().greater_than(&self.end_frame())))]
-    #[ensures(result == !(self.start_frame().less_than_equal(&self.end_frame())))]
+    #[ensures(result == (self.start_frame() > self.end_frame()))]
+    #[ensures(result == !(self.start_frame() <= self.end_frame()))]
     pub fn is_empty(&self) -> bool {
-        !(self.start_frame().less_than_equal(&self.end_frame()))
+        !(self.start_frame() <= self.end_frame())
     }
 
     #[pure]
@@ -247,21 +180,21 @@ impl FrameRange {
     #[ensures({
         let starts = max_frame(self.start_frame(), other.start_frame());
         let ends   = min_frame(self.end_frame(), other.end_frame());
-        result == starts.less_than_equal(&ends) 
+        result == (starts <= ends) 
    })]
     /// Returning a FrameRange here requires use to set the RangeInclusive new function as pure which
     /// requires Idx to be Copy, so just return bool.
     pub fn range_overlaps(&self, other: &FrameRange) -> bool {
         let starts = max_frame(self.start_frame(), other.start_frame());
         let ends   = min_frame(self.end_frame(), other.end_frame());
-        starts.less_than_equal(&ends)
+        starts <= ends
     }
 
     #[pure]
     pub fn contains_range(&self, other: &FrameRange) -> bool {
         !other.is_empty()
-        && (other.start_frame().greater_than_equal(&self.start_frame()))
-        && (other.end_frame().less_than_equal(&self.end_frame()))
+        && (other.start_frame() >= self.start_frame())
+        && (other.end_frame() <= self.end_frame())
     }
 
     /// Splits a range into 1-3 ranges, depending on where the split is at.
@@ -280,8 +213,8 @@ impl FrameRange {
     })]
     #[ensures(result.is_ok() ==> {
         let split_range = peek_result_ref(&result);
-        ((split_range.0).is_some() ==> peek_option_ref(&split_range.0).end_frame() == split_range.1.start_frame().minus(1))
-        && ((split_range.2).is_some() ==> peek_option_ref(&split_range.2).start_frame() == split_range.1.end_frame().plus(1))
+        ((split_range.0).is_some() ==> peek_option_ref(&split_range.0).end_frame() == split_range.1.start_frame() - 1)
+        && ((split_range.2).is_some() ==> peek_option_ref(&split_range.2).start_frame() == split_range.1.end_frame() + 1)
     })]
     #[ensures(result.is_ok() ==> {
         let split_range = peek_result_ref(&result);
@@ -304,19 +237,21 @@ impl FrameRange {
 
         let start_frame = frames_to_extract.start_frame();
         let end_frame = frames_to_extract.end_frame();
-
+        
         let before_start = if start_frame == min_frame || start_frame == self.start_frame() {
             None
         } else {
-            Some(FrameRange::new(self.start_frame(), start_frame.minus(1)))
+            let a = FrameRange::new(self.start_frame(), start_frame - 1);
+            Some(a)
+
         };
-
+        
         let start_to_end = frames_to_extract;
-
+        
         let after_end = if end_frame == max_frame || end_frame == self.end_frame() {
             None
         } else {
-            Some(FrameRange::new(end_frame.plus(1), self.end_frame())) 
+            Some(FrameRange::new(end_frame + 1, self.end_frame())) 
         };
 
         Ok((before_start, start_to_end, after_end))
@@ -350,7 +285,7 @@ impl FrameRange {
         let split_range = peek_result_ref(&result);
         (!split_range.0.is_empty() && !split_range.1.is_empty()) ==> (
             split_range.0.start_frame() == self.start_frame() 
-            && split_range.0.end_frame() == at_frame.minus(1) 
+            && split_range.0.end_frame() == at_frame - 1
             && split_range.1.start_frame() == at_frame 
             && split_range.1.end_frame() == self.end_frame()
         )
@@ -363,19 +298,19 @@ impl FrameRange {
         if self.is_empty() {
             return Err(self);
         }
-        let end_of_first = at_frame.minus(1);
+        let end_of_first = at_frame - 1;
 
-        let (first, second) = if at_frame == self.start_frame() && at_frame.less_than_equal(&self.end_frame()) {
+        let (first, second) = if (at_frame == self.start_frame()) && (at_frame <= self.end_frame()) {
             let first  = FrameRange::empty();
             let second = FrameRange::new(at_frame, self.end_frame());
             (first, second)
         } 
-        else if at_frame == self.end_frame().plus(1) && end_of_first.greater_than_equal(&self.start_frame()) {
+        else if (at_frame == self.end_frame() + 1) && (end_of_first >= self.start_frame()) {
             let first  = FrameRange::new(self.start_frame(), self.end_frame()); 
             let second = FrameRange::empty();
             (first, second)
         }
-        else if at_frame.greater_than(&self.start_frame()) && end_of_first.less_than_equal(&self.end_frame()) {
+        else if (at_frame > self.start_frame()) && (end_of_first <= self.end_frame()) {
             let first  = FrameRange::new(self.start_frame(), end_of_first);
             let second = FrameRange::new(at_frame, self.end_frame());
             (first, second)
@@ -396,9 +331,9 @@ impl FrameRange {
     /// or `self`s end has been updated to `other`'s end
     /// * If it fails, then `self` remains unchanged and `other` is returned
     #[ensures(result.is_ok() ==> 
-        (old(self.start_frame()) == other.end_frame().plus(1) && self.start_frame() == other.start_frame() && self.end_frame() == old(self.end_frame())) 
+        (old(self.start_frame()) == other.end_frame() + 1 && self.start_frame() == other.start_frame() && self.end_frame() == old(self.end_frame())) 
         || 
-        (old(self.end_frame()).plus(1) == other.start_frame() && self.end_frame() == other.end_frame() && self.start_frame() == old(self.start_frame()))
+        (old(self.end_frame()) + 1 == other.start_frame() && self.end_frame() == other.end_frame() && self.start_frame() == old(self.start_frame()))
     )]
     #[ensures(result.is_err() ==> {
         let chunk = peek_err_ref(&result);
@@ -412,11 +347,11 @@ impl FrameRange {
             return Err(other);
         }
 
-        if self.start_frame() == other.end_frame().plus(1) {
+        if self.start_frame() == (other.end_frame() + 1) {
             // `other` comes contiguously before `self`
             *self = FrameRange::new(other.start_frame(), self.end_frame());
         } 
-        else if self.end_frame().plus(1) == other.start_frame() {
+        else if (self.end_frame() + 1) == other.start_frame() {
             // `self` comes contiguously before `other`
             *self = FrameRange::new(self.start_frame(), other.end_frame());
         }
