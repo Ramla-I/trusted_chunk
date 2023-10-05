@@ -3,7 +3,7 @@ This crate contains a TrustedChunk type with verified methods that prevent creat
 This is done by storing information about all previously created chunks in a verified bookkeeping data structure (an array before heap initialization and a linked list after). A TrustedChunkAllocator stores the bookkeeping structures and provides the only public interface to create a TrustedChunk. All chunks created from a single TrustedChunkAllocator instance do not overlap.
 
 ## Running Prusti on this crate
-1. Download the pre-compiled binary for Release v-2023-01-26 from [here](https://github.com/viperproject/prusti-dev/releases/tag/v-2023-01-26-1935)
+1. Download the pre-compiled binary for Release v-2023-08-22 from [here](https://github.com/viperproject/prusti-dev/releases/)
 2. Navigate to the prusti-release folder
 3. Run this command 
 ```
