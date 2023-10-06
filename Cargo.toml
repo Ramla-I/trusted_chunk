@@ -9,7 +9,8 @@ edition = "2021"
 # prusti-contracts = { git = "https://github.com/viperproject/prusti-dev.git" }
 prusti-contracts = "^0.1"
 cfg-if = "1.0.0"
-range_inclusive = {git = "https://github.com/Ramla-I/range_inclusive"}
+range_inclusive = {path = "../range_inclusive"}
+memory_structs = { path = "../../kernel/memory_structs"}
 spin = "0.9.4"
 
 [features]
