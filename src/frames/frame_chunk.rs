@@ -11,7 +11,7 @@ use crate::{
     external_spec::{trusted_option::*, trusted_result::*, partial_ord::*},
     frames::frame_range::*,
     generic::{
-        range_trait::UniqueCheck,
+        unique_trait::UniqueCheck,
         linked_list_generic::*,
         static_array_generic::*
     }

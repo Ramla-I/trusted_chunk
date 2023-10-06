@@ -15,8 +15,12 @@ mod generic;
 mod frames;
 mod pages;
 
+pub use frames::frame_chunk;
+pub use pages::page_chunk;
+
 cfg_if::cfg_if! {
 if #[cfg(prusti)] {
+    use frames::frame_range::FrameRange;
     use crate::external_spec::trusted_range_inclusive::*;
 } else {
     extern crate alloc;
@@ -29,42 +33,19 @@ if #[cfg(prusti)] {
 }
 
 
-// #[cfg(not(prusti))] // prusti can't reason about fn pointers
-// pub fn init() -> Result<fn(RangeInclusive<usize>) -> trusted_chunk::TrustedChunk, &'static str> {
-//     if INIT.is_completed() {
-//         Err("Trusted Chunk has already been initialized and callback has been returned")
-//     } else {
-//         INIT.call_once(|| true);
-//         Ok(create_from_unmapped)
-//     }
-// }
+#[cfg(not(prusti))] // prusti can't reason about fn pointers
+pub fn init_frame_chunk() -> Result<fn(FrameRange) -> frame_chunk::FrameChunk, &'static str> {
+    if INIT.is_completed() {
+        Err("Trusted Chunk has already been initialized and callback has been returned")
+    } else {
+        INIT.call_once(|| true);
+        Ok(create_from_unmapped)
+    }
+}
 
-// #[requires(*frames.start() <= *frames.end())]
-// #[ensures(result.start() == *frames.start())]
-// #[ensures(result.end() == *frames.end())]
-// fn create_from_unmapped(frames: RangeInclusive<usize>) -> trusted_chunk::TrustedChunk {
-//     trusted_chunk::TrustedChunk::trusted_new(frames)
-// }
-
-// /// A macro for defining `PageRange` and `FrameRange` structs
-// /// and implementing their common traits, which are generally identical.
-// macro_rules! implement_page_frame_range {
-//     ($TypeName:ident, $desc:literal, $short:ident, $chunk:ident) => {
-//         paste! { // using the paste crate's macro for easy concatenation
-                        
-//             #[doc = "A range of [`" $chunk "`]s that are contiguous in " $desc " memory."]
-//             #[derive(Clone, PartialEq, Eq)]
-//             pub struct $TypeName(RangeInclusive<$chunk>);
-
-//             impl $TypeName {
-//                 #[doc = "Creates a new range of [`" $chunk "`]s that spans from `start` to `end`, both inclusive bounds."]
-//                 pub const fn new(start: $chunk, end: $chunk) -> $TypeName {
-//                     $TypeName(RangeInclusive::new(start, end))
-//                 }
-//             }
-//         }
-//     }
-// }
-
-// implement_page_frame_range!(FrameRange, "physical", phys, Frame);
-
+#[requires(frames.start_frame() <= frames.end_frame())]
+#[ensures(result.start_frame() == frames.start_frame())]
+#[ensures(result.end_frame() == frames.end_frame())]
+fn create_from_unmapped(frames: FrameRange) -> frame_chunk::FrameChunk {
+    frame_chunk::FrameChunk::trusted_new(frames)
+}

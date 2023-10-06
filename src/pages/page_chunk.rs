@@ -5,13 +5,18 @@ use crate::external_spec::trusted_range_inclusive::*;
 #[cfg(not(prusti))]
 use range_inclusive::*;
 
+#[cfg(prusti)]
+use crate::pages::page_range::*;
+#[cfg(not(prusti))]
+use memory_structs::{Page, PageRange};
+
+
 use core::ops::{Deref, DerefMut};
 use crate::{
     *,
     external_spec::{trusted_option::*, trusted_result::*, partial_ord::*},
-    pages::page_range::*,
     generic::{
-        range_trait::UniqueCheck,
+        unique_trait::UniqueCheck,
         linked_list_generic::*,
         static_array_generic::*
     }

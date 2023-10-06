@@ -7,7 +7,7 @@ use range_inclusive::*;
 
 use crate::{
     external_spec::{trusted_option::*, trusted_result::*},
-    generic::range_trait::*,
+    generic::unique_trait::*,
 };
 
 pub struct StaticArray<T: UniqueCheck> {

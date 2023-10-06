@@ -11,7 +11,7 @@ use core::cmp::{PartialOrd, Ord, Ordering};
 use crate::{
     *,
     external_spec::{trusted_option::*, trusted_result::*, partial_ord::*},
-    generic::range_trait::*,
+    generic::unique_trait::*,
 };
 
 pub(crate) const MAX_VIRTUAL_ADDRESS: usize = usize::MAX;
