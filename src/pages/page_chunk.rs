@@ -155,7 +155,7 @@ impl PageChunkAllocator{
     })]
     #[ensures(result.is_ok() ==> {
         let (new_chunk, _) = peek_result_ref(&result);
-        new_chunk.start() == *chunk_range.start() && new_chunk.end() == *chunk_range.end()
+        new_chunk.start() == chunk_range.start() && new_chunk.end() == chunk_range.end()
     })]
     #[ensures(result.is_ok() ==> {
         (self.heap_init && forall(|i: usize| (0 <= i && i < old(self.list.len())) ==> !old(self.list.lookup_copy(i)).overlaps(&chunk_range)))
@@ -202,14 +202,14 @@ pub struct PageChunk {
 impl PageChunk {
     #[pure]
     #[trusted]
-    #[ensures(result == *self.frames.start())]
+    #[ensures(result == self.frames.start())]
     pub fn start(&self) -> &Page {
         self.frames.start()
     }
 
     #[pure]
     #[trusted]
-    #[ensures(result == *self.frames.end())]
+    #[ensures(result == self.frames.end())]
     pub fn end(&self) -> &Page {
         self.frames.end()
     }
@@ -247,7 +247,7 @@ impl PageChunk {
     })]
     #[ensures(result.is_ok() ==> {
         let new_chunk = peek_result_ref(&result);
-        new_chunk.start() == *chunk_range.start() && new_chunk.end() == *chunk_range.end()
+        new_chunk.start() == chunk_range.start() && new_chunk.end() == chunk_range.end()
     })]
     #[ensures(result.is_ok() ==> {
         chunk_list.len() >= 1 && snap(chunk_list.lookup(0)) === &chunk_range
@@ -305,7 +305,7 @@ impl PageChunk {
     })]
     #[ensures(result.is_ok() ==> {
         let (new_chunk, _) = peek_result_ref(&result);
-        new_chunk.start() == *chunk_range.start() && new_chunk.end() == *chunk_range.end()
+        new_chunk.start() == chunk_range.start() && new_chunk.end() == chunk_range.end()
     })]
     #[ensures(result.is_ok() ==> {
         let idx = peek_result_ref(&result).1;
@@ -344,8 +344,8 @@ impl PageChunk {
     /// 
     /// Only used within other verified functions, or registered as a callback
     #[requires(frames.start_page() <= frames.end_page())]
-    #[ensures(result.start() == frames.start_page())]
-    #[ensures(result.end() == frames.end_page())]
+    #[ensures(result.start() == frames.start())]
+    #[ensures(result.end() == frames.end())]
     pub(crate) fn trusted_new(frames: PageRange) -> PageChunk {
         PageChunk{ frames }
     }
