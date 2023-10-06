@@ -9,12 +9,16 @@ use crate::external_spec::trusted_range_inclusive::*;
 #[cfg(not(prusti))]
 use range_inclusive::*;
 
+#[cfg(prusti)]
+use crate::generic::unique_trait::*;
+#[cfg(not(prusti))]
+use unique_trait::*;
+
 #[cfg(not(prusti))]
 use alloc::boxed::Box;
 
 use crate::{
     external_spec::{trusted_option::*, trusted_result::*},
-    generic::unique_trait::*,
 };
 use core::{mem, marker::Copy, ops::Deref};
 
@@ -41,7 +45,7 @@ impl<T> List<T> {
     }
 
     #[ensures(result.len() == 0)]
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         List { head: None }
     }
 

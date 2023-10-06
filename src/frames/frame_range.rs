@@ -5,13 +5,17 @@ use crate::external_spec::trusted_range_inclusive::*;
 #[cfg(not(prusti))]
 use range_inclusive::*;
 
+#[cfg(prusti)]
+use crate::generic::unique_trait::*;
+#[cfg(not(prusti))]
+use unique_trait::*;
+
 use core::char::MAX;
 use core::ops::{Deref, DerefMut, Add, Sub};
 use core::cmp::{PartialOrd, Ord, Ordering};
 use crate::{
     *,
     external_spec::{trusted_option::*, trusted_result::*},
-    generic::unique_trait::*,
 };
 
 pub(crate) const MAX_VIRTUAL_ADDRESS: usize = usize::MAX;

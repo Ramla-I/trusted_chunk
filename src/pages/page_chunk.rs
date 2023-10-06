@@ -6,17 +6,20 @@ use crate::external_spec::trusted_range_inclusive::*;
 use range_inclusive::*;
 
 #[cfg(prusti)]
+use crate::generic::unique_trait::*;
+#[cfg(not(prusti))]
+use unique_trait::*;
+
+#[cfg(prusti)]
 use crate::pages::page_range::*;
 #[cfg(not(prusti))]
 use memory_structs::{Page, PageRange};
-
 
 use core::ops::{Deref, DerefMut};
 use crate::{
     *,
     external_spec::{trusted_option::*, trusted_result::*, partial_ord::*},
     generic::{
-        unique_trait::UniqueCheck,
         linked_list_generic::*,
         static_array_generic::*
     }
@@ -49,7 +52,7 @@ pub struct PageChunkAllocator{
 
 impl PageChunkAllocator{
     /// Creates an allocator with empty bookkeeping structures
-    pub fn new() -> PageChunkAllocator{
+    pub const fn new() -> PageChunkAllocator{
         PageChunkAllocator{ heap_init: false, list: List::new(), array: StaticArray::new() }
     }
 
@@ -200,15 +203,19 @@ impl PageChunk {
     #[pure]
     #[trusted]
     #[ensures(result == *self.frames.start())]
-    pub fn start(&self) -> Page {
-        *self.frames.start()
+    pub fn start(&self) -> &Page {
+        self.frames.start()
     }
 
     #[pure]
     #[trusted]
     #[ensures(result == *self.frames.end())]
-    pub fn end(&self) -> Page {
-        *self.frames.end()
+    pub fn end(&self) -> &Page {
+        self.frames.end()
+    }
+
+    pub const fn pages(&self) -> PageRange {
+        self.frames //To Do: update terminology
     }
 
     #[ensures(result.is_empty())]

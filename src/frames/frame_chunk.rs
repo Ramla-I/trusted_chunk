@@ -5,13 +5,21 @@ use crate::external_spec::trusted_range_inclusive::*;
 #[cfg(not(prusti))]
 use range_inclusive::*;
 
+#[cfg(prusti)]
+use crate::generic::unique_trait::*;
+#[cfg(not(prusti))]
+use unique_trait::*;
+
+#[cfg(prusti)]
+use crate::frames::frame_range::*;
+#[cfg(not(prusti))]
+use memory_structs::{Frame, FrameRange};
+
 use core::ops::{Deref, DerefMut};
 use crate::{
     *,
     external_spec::{trusted_option::*, trusted_result::*, partial_ord::*},
-    frames::frame_range::*,
     generic::{
-        unique_trait::UniqueCheck,
         linked_list_generic::*,
         static_array_generic::*
     }
@@ -43,7 +51,7 @@ pub struct FrameChunkAllocator {
 
 impl FrameChunkAllocator {
     /// Creates an allocator with empty bookkeeping structures
-    pub fn new() -> FrameChunkAllocator {
+    pub const fn new() -> FrameChunkAllocator {
         FrameChunkAllocator { heap_init: false, list: List::new(), array: StaticArray::new() }
     }
 
@@ -194,15 +202,15 @@ impl FrameChunk {
     #[pure]
     #[trusted]
     #[ensures(result == *self.frames.start())]
-    pub fn start(&self) -> Frame {
-        *self.frames.start()
+    pub fn start(&self) -> &Frame {
+        self.frames.start()
     }
 
     #[pure]
     #[trusted]
     #[ensures(result == *self.frames.end())]
-    pub fn end(&self) -> Frame {
-        *self.frames.end()
+    pub fn end(&self) -> &Frame {
+        self.frames.end()
     }
 
     #[ensures(result.is_empty())]

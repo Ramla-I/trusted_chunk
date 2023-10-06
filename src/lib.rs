@@ -26,7 +26,9 @@ if #[cfg(prusti)] {
     extern crate alloc;
     extern crate range_inclusive;
     extern crate spin;
-    use range_inclusive::*;
+    extern crate unique_trait;
+
+    use memory_structs::FrameRange;
 
     static INIT: spin::Once<bool> = spin::Once::new();
 }
