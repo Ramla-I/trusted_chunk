@@ -13,9 +13,6 @@ This is done by storing information about all previously created chunks in a ver
 ```
 ./prusti-rustc ../trusted_chunk/src/lib.rs -Pcheck_overflows=false -Puse_new_encoder=false -Pcache_path=bin --crate-type=lib --cfg "prusti" --cfg "std"
 ```
-## Notes for Prusti improvements
-1. Eq, PartialEq, Ord, etc. traits should be pure by default
-2. Functions for structs with generics lead to internal compiler errors
 
 ## Working with cargo-prusti
 We can also use the cargo-prusti tool by running it in the repo with the Cargo.toml file, and adding a Prusti.toml file with the prusti flags.
@@ -23,3 +20,6 @@ We would also have to change the syntax for conditional compilation in the crate
 ```
 ./<path>/cargo-prusti  --features prusti
 ```
+
+## TODO:
+1. crate should be part of Theseus, not submodule. Then we can add config flags directly to range_inclusive and memory structs crate.
