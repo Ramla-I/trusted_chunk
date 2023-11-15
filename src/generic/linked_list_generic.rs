@@ -4,15 +4,11 @@
 
 use prusti_contracts::*;
 
-#[cfg(prusti)]
-use crate::external_spec::trusted_range_inclusive::*;
-#[cfg(not(prusti))]
-use range_inclusive::*;
 
-#[cfg(prusti)]
+// #[cfg(prusti)]
 use crate::generic::unique_trait::*;
-#[cfg(not(prusti))]
-use unique_trait::*;
+// #[cfg(not(prusti))]
+// use unique_trait::*;
 
 #[cfg(not(prusti))]
 use alloc::boxed::Box;
@@ -158,21 +154,21 @@ impl<T: UniqueCheck> List<T> {
 
     #[pure]
     #[requires(index < self.len())]
-    pub fn lookup_copy(&self, index: usize) -> T {
+    #[ensures(result == snap(self.lookup(index)))]
+    fn lookup_copy(&self, index: usize) -> T {
         link_lookup_copy(&self.head, index)
     }
 
-    #[requires(0 <= index && index <= self.len())]
+    #[requires(index <= self.len())]
     #[ensures(result.is_some() ==> peek_option(&result) < self.len())]
     #[ensures(result.is_some() ==> {
-            let idx = peek_option(&result);
-            let range = self.lookup_copy(idx);
+            let range = self.lookup(peek_option(&result));
             range.overlaps(&elem)
         }
     )]
     #[ensures(result.is_none() ==> 
         forall(|i: usize| (index <= i && i < self.len()) ==> {
-            let range = self.lookup_copy(i);
+            let range = self.lookup(i);
             !range.overlaps(&elem)
         })
     )]
@@ -180,7 +176,9 @@ impl<T: UniqueCheck> List<T> {
         if index == self.len() {
             return None;
         }
-        let ret = if self.lookup_copy(index).overlaps(&elem) {
+
+        // We need the copy because otherwise prusti compiler error about chaining pure functions
+        let ret = if self.lookup_copy(index).overlaps(&elem) { 
             Some(index)
         } else {
             self.elem_overlaps_in_list(elem, index + 1)
@@ -189,25 +187,26 @@ impl<T: UniqueCheck> List<T> {
     }
 
 
-    #[requires(forall(|i: usize, j: usize| (0 <= i && i < self.len() && 0 <= j && j < self.len()) ==> 
-        (i != j ==> !self.lookup_copy(i).overlaps(&self.lookup_copy(j))))
+    #[requires(forall(|i: usize, j: usize| (i < self.len() && i < j && j < self.len()) ==> 
+        !self.lookup(j).overlaps(&self.lookup(i)))
     )]
     #[ensures(result.is_err() ==> peek_err(&result) < self.len())]
     #[ensures(result.is_err() ==> {
-            let idx = peek_err(&result);
-            let range = self.lookup_copy(idx);
+            let range = self.lookup(peek_err(&result));
             range.overlaps(&elem)
         }
     )]
     #[ensures(result.is_ok() ==> self.len() == old(self.len()) + 1)] 
     #[ensures(result.is_ok() ==> snap(self.lookup(0)) === elem)]
-    #[ensures(result.is_ok() ==> self.lookup_copy(0) == elem)]
-    #[ensures(result.is_ok() ==> forall(|i: usize| (1 <= i && i < self.len()) ==> old(self.lookup_copy(i-1)) == self.lookup_copy(i)))]
+    #[ensures(result.is_ok() ==> forall(|i: usize| (1 <= i && i < self.len()) ==> old(self.lookup(i-1)) == self.lookup(i)))]
+    #[ensures(result.is_ok() ==> {
+        forall(|i: usize| (1 <= i && i < self.len()) ==> !self.lookup(i).overlaps(&elem))
+    })]
     #[ensures(result.is_ok() ==> {
         forall(|i: usize| (1 <= i && i < self.len()) ==> !(self.lookup_copy(i).overlaps(&elem)))
     })]
-    #[ensures(forall(|i: usize, j: usize| (0 <= i && i < self.len() && 0 <= j && j < self.len()) ==> 
-        (i != j ==> !self.lookup_copy(i).overlaps(&self.lookup_copy(j))))
+    #[ensures(forall(|i: usize, j: usize| (i < self.len() && i < j && j < self.len()) ==> 
+        !self.lookup(j).overlaps(&self.lookup(i)))
     )]
     pub fn push_unique_with_precond(&mut self, elem: T) -> Result<(),usize> {
         match self.elem_overlaps_in_list(elem, 0) {
@@ -227,6 +226,7 @@ impl<T: UniqueCheck> List<T> {
 
 #[pure]
 #[requires(index < link_len(link))]
+#[ensures(result == snap(link_lookup(link, index)))]
 fn link_lookup_copy<T: UniqueCheck>(link: &Link<T>, index: usize) -> T {
     match link {
         Some(node) => {

@@ -11,9 +11,9 @@ prusti-contracts = "^0.1"
 cfg-if = "1.0.0"
 spin = "0.9.4"
 
-range_inclusive = {path = "../range_inclusive"}
-memory_structs = { path = "../../kernel/memory_structs"}
-unique_trait = { path = "../../kernel/unique_trait"}
+# range_inclusive = {git = "https://github.com/Ramla-I/range_inclusive"}
+# memory_structs = { path = "../../kernel/memory_structs"}
+# unique_trait = { path = "../../kernel/unique_trait"}
 
 [features]
 default = []

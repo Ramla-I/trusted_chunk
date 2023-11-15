@@ -12,42 +12,41 @@ extern crate core;
 
 mod external_spec;
 mod generic;
-mod frames;
-mod pages;
+// mod frames;
+// mod pages;
 
-pub use frames::frame_chunk;
-pub use pages::page_chunk;
+// pub use frames::frame_chunk;
+// pub use pages::page_chunk;
 
-cfg_if::cfg_if! {
-if #[cfg(prusti)] {
-    use frames::frame_range::FrameRange;
-    use crate::external_spec::trusted_range_inclusive::*;
-} else {
+// cfg_if::cfg_if! {
+// if #[cfg(prusti)] {
+//     use frames::frame_range::FrameRange;
+//     use crate::external_spec::trusted_range_inclusive::*;
+// } else {
     extern crate alloc;
-    extern crate range_inclusive;
-    extern crate spin;
-    extern crate unique_trait;
+//     extern crate range_inclusive;
+//     extern crate spin;
 
-    use memory_structs::FrameRange;
+//     use memory_structs::FrameRange;
 
-    static INIT: spin::Once<bool> = spin::Once::new();
-}
-}
+//     static INIT: spin::Once<bool> = spin::Once::new();
+// }
+// }
 
 
-#[cfg(not(prusti))] // prusti can't reason about fn pointers
-pub fn init_frame_chunk() -> Result<fn(FrameRange) -> frame_chunk::FrameChunk, &'static str> {
-    if INIT.is_completed() {
-        Err("Trusted Chunk has already been initialized and callback has been returned")
-    } else {
-        INIT.call_once(|| true);
-        Ok(create_from_unmapped)
-    }
-}
+// #[cfg(not(prusti))] // prusti can't reason about fn pointers
+// pub fn init_frame_chunk() -> Result<fn(FrameRange) -> frame_chunk::FrameChunk, &'static str> {
+//     if INIT.is_completed() {
+//         Err("Trusted Chunk has already been initialized and callback has been returned")
+//     } else {
+//         INIT.call_once(|| true);
+//         Ok(create_from_unmapped)
+//     }
+// }
 
-#[requires(frames.start_frame() <= frames.end_frame())]
-#[ensures(result.start_frame() == frames.start_frame())]
-#[ensures(result.end_frame() == frames.end_frame())]
-fn create_from_unmapped(frames: FrameRange) -> frame_chunk::FrameChunk {
-    frame_chunk::FrameChunk::trusted_new(frames)
-}
+// #[requires(frames.start_frame() <= frames.end_frame())]
+// #[ensures(result.start_frame() == frames.start_frame())]
+// #[ensures(result.end_frame() == frames.end_frame())]
+// fn create_from_unmapped(frames: FrameRange) -> frame_chunk::FrameChunk {
+//     frame_chunk::FrameChunk::trusted_new(frames)
+// }
