@@ -55,10 +55,11 @@ impl<T: UniqueCheck> StaticArray<T> {
     //     forall(|j: usize| (i <= j && j < self.arr.len()) ==> self.arr[j].is_none())
     // }))]
     #[ensures(result.is_err() ==> 
-        forall(|i: usize| (i < self.arr.len()) ==> self.arr[i].is_some() && old(self.arr[i]) == self.arr[i])
+        forall(|i: usize| (i < self.len()) ==> self.lookup(i).is_some() && old(self.lookup(i)) == self.lookup(i))
     )]
-    #[ensures(result.is_ok() ==> self.arr[peek_result(&result)].is_some())]
-    #[ensures(result.is_ok() ==> value == peek_option(&self.arr[peek_result(&result)]))]
+    #[ensures(result.is_ok() ==> peek_result(&result) < self.len())]
+    #[ensures(result.is_ok() ==> self.lookup(peek_result(&result)).is_some())]
+    #[ensures(result.is_ok() ==> value == peek_option(&self.lookup(peek_result(&result))))]
     #[ensures(result.is_ok() ==> 
         forall(|i: usize| (i < self.arr.len() && i != peek_result(&result)) ==> old(self.arr[i]) == self.arr[i])
     )] 
@@ -96,14 +97,14 @@ impl<T: UniqueCheck> StaticArray<T> {
     /// * if the result is Some(idx), then the element at idx is Some(_)
     /// * if the result is Some(idx), then the element at idx overlaps with `elem`
     /// * if the result is None, then no element in the array overlaps with `elem`
-    #[requires(index <= self.arr.len())]
-    #[ensures(result.is_some() ==> peek_option(&result) < self.arr.len())]
-    #[ensures(result.is_some() ==> self.arr[peek_option(&result)].is_some())]
+    // #[requires(index <= self.arr.len())]
+    #[requires(index <= self.len())]
+    #[ensures(result.is_some() ==> peek_option(&result) < self.len())]
     #[ensures(result.is_some() ==> self.lookup(peek_option(&result)).is_some())]
-    #[ensures(result.is_some() ==> peek_option(&self.arr[peek_option(&result)]).overlaps(&elem))]
+    #[ensures(result.is_some() ==> peek_option(&self.lookup(peek_option(&result))).overlaps(&elem))]
     #[ensures(result.is_none() ==> 
-        forall(|i: usize| ((index <= i && i < self.arr.len()) && self.arr[i].is_some()) ==> {
-            !peek_option(&self.arr[i]).overlaps(&elem)
+        forall(|i: usize| ((index <= i && i < self.len()) && self.lookup(i).is_some()) ==> {
+            !peek_option(&self.lookup(i)).overlaps(&elem)
         })
     )]
     pub(crate) fn elem_overlaps_in_array(&self, elem: T, index: usize) -> Option<usize> {
