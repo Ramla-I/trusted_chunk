@@ -42,21 +42,6 @@ impl<T: ResourceIdentifier<Resource = R>, R> ResourceAllocator<T, R> {
     }
 
 
-    // #[ensures(result.is_err() ==> 
-    //     match peek_err(&result) {
-    //         RepresentationCreationError::Overlap(idx) =>
-    //             match self.array {
-    //                 Some(ref array) => (idx < array.len()) && array.lookup(idx).is_some() 
-    //                     && peek_option(&array.lookup(idx)).overlaps(&resource_id),
-    //                 None => (idx < self.list.len()) && self.list.lookup(idx).overlaps(&resource_id)
-    //             },
-    //         RepresentationCreationError::NoSpace =>
-    //             match snap(&self.array) {
-    //                 Some(array) => forall(|i: usize| (i < array.len()) ==> array.lookup(i).is_some()),
-    //                 None => unreachable!()
-    //             }
-    //     }
-    // )]
     #[requires(match self.array {
         Some(ref array) => {
             forall(|i: usize| (i < array.arr.len() && array.arr[i].is_some()) ==> {

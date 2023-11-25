@@ -30,75 +30,7 @@ impl<T: ResourceIdentifier> StaticArray<T> {
         self.arr[index]
     }
 
-    // #[requires(index < self.len())]
-    // #[ensures(self.lookup(index) == Some(value))]
-    // #[ensures(self.lookup(index).is_some())]
-    // #[ensures(forall(|i: usize| (i < self.len() && i != index) ==> old(self.lookup(i)) == self.lookup(i)))]
-    // #[ensures(forall(|i: usize| (i < self.len() && i != index) ==> old(self.lookup(i).is_some()) ==> self.lookup(i).is_some()))]
-    // fn set_element(&mut self, index: usize, value: T) {
-    //     self.arr[index] = Some(value);
-    // }
-
-    // /// I tried to verify this using the public interface, but it eventually leads to Prusti errors.
-    // /// So for now I'm sticking with the function that accesses the array directly.
-    // ///
-    // /// Adds an element to the array if there's space.
-    // /// 
-    // /// # Pre-conditions:
-    // /// * The array is ordered so that all Some(_) elements occur at the beginning of the array, followed by all None elements.
-    // ///
-    // /// # Post-conditions:
-    // /// * If the push fails, then all elements remain unchanged and were Some(_)
-    // /// * If the push succeeds, then the element at the returned index is now Some(_)
-    // /// * If the push succeeds, then the element at the returned index is equal to `value`
-    // /// * If the push succeeds, then all the elements are unchanged except at the returned index 
-    // /// * If successful, then the array remains ordered with all Some elements followed by all None elements
-    // #[requires(forall(|i: usize| (i < self.len() && self.lookup(i).is_some()) ==> {
-    //     forall(|j: usize| (j < i) ==> self.lookup(j).is_some())
-    // }))]
-    // #[requires(forall(|i: usize| (i < self.len() && self.lookup(i).is_none()) ==> {
-    //     forall(|j: usize| (i <= j && j < self.len()) ==> self.lookup(j).is_none())
-    // }))]
-    // #[ensures(result.is_err() ==> 
-    //     forall(|i: usize| (i < self.len()) ==> self.lookup(i).is_some() && old(self.lookup(i)) == self.lookup(i))
-    // )]
-    // #[ensures(result.is_ok() ==> peek_result(&result) < self.len())]
-    // #[ensures(result.is_ok() ==> self.lookup(peek_result(&result)).is_some())]
-    // #[ensures(result.is_ok() ==> value == peek_option(&self.lookup(peek_result(&result))))]
-    // #[ensures(result.is_ok() ==> 
-    //     forall(|i: usize| (i < self.len() && i != peek_result(&result)) ==> old(self.lookup(i)) == self.lookup(i))
-    // )] 
-    // // #[ensures(forall(|i: usize| (i < self.len() && self.lookup(i).is_some()) ==> {
-    // //     forall(|j: usize| (j < i) ==> self.lookup(j).is_some())
-    // // }))]
-    // // #[ensures(forall(|i: usize| (i < self.arr.len() && self.arr[i].is_none()) ==> {
-    // //     forall(|j: usize| (i <= j && j < self.arr.len()) ==> self.arr[j].is_none())
-    // // }))]
-	// pub(crate) fn push(&mut self, value: T) -> Result<usize,()> {
-    //     let mut i = 0;
-
-    //     while i < self.len() {
-    //         body_invariant!(i < self.len());
-    //         body_invariant!(forall(|j: usize| (j < i ==> self.lookup(j).is_some())));
-    //         body_invariant!(forall(|j: usize| (j < i ==> self.arr[j].is_some())));
-
-    //         if self.lookup(i).is_none() {
-    //             prusti_assert!(forall(|j: usize| (j >= i && j < self.len() ==> self.lookup(j).is_none())));
-
-    //             self.arr[i] = Some(value);
-    //             prusti_assert!(self.lookup(i).is_some());
-    //             prusti_assert!(!self.lookup(i).is_none());
-
-    //             prusti_assert!(forall(|j: usize| (j <= i ==> self.arr[j].is_some())));
-    //             prusti_assert!(forall(|j: usize| (j <= i ==> self.lookup(j).is_some())));
-    //             prusti_assert!(forall(|j: usize| (j > i && j < self.len() ==> self.arr[j].is_none())));
-    //             return Ok(i)
-    //         }
-    //         i += 1;
-    //     }
-    //     return Err(());
-	// }
-
+    
     predicate! {
         // predicate to check that the elements in the array are ordered
         fn ordered_static_array(&self) -> bool {
