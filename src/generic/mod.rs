@@ -1,5 +1,5 @@
 pub mod linked_list_generic;
 pub mod static_array_generic;
-pub mod unique_trait;
+pub mod resource_identifier;
 pub mod allocator_generic;
-pub mod pci;
+// pub mod pci;

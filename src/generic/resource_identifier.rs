@@ -1,6 +1,6 @@
 use prusti_contracts::*;
 
-pub trait UniqueCheck: Copy + PartialEq {
+pub trait ResourceIdentifier: Copy + PartialEq {
     type Resource;
 
     #[pure]

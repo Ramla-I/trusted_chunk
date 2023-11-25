@@ -1,5 +1,5 @@
 use prusti_contracts::*;
-use super::{unique_trait::UniqueCheck, static_array_generic::StaticArray};
+use super::{resource_identifier::ResourceIdentifier, static_array_generic::StaticArray};
 use super::linked_list_generic::List;
 use crate::external_spec::{
     trusted_option::*,
@@ -12,21 +12,21 @@ pub enum RepresentationCreationError {
     NoSpace
 }
 
-pub struct ResourceAllocator<T: UniqueCheck<Resource = R>, R> {
+pub struct ResourceAllocator<T: ResourceIdentifier<Resource = R>, R> {
     array: Option<StaticArray<T>>,
     list: List<T>,
     constructor: fn(&T) -> R
 }
 
-impl<T: UniqueCheck<Resource = R>, R> ResourceAllocator<T, R> {
-    #[trusted] // so we can takea  function pointer as an argument
+impl<T: ResourceIdentifier<Resource = R>, R> ResourceAllocator<T, R> {
+    #[trusted] // so we can take a function pointer as an argument
     #[ensures(result.list.len() == 0)]
-    #[ensures(!pre_heap ==> result.array.is_none())]
-    #[ensures(pre_heap ==> result.array.is_some())]
-    #[ensures(pre_heap ==> {
-        let array = peek_option_ref(&result.array);
-        forall(|i: usize| (i < array.len()) ==> array.lookup(i).is_none())
-    })]
+    #[ensures(
+        match result.array {
+            Some(ref array) => pre_heap && forall(|i: usize| (i < array.len()) ==> array.lookup(i).is_none()),
+            None => !pre_heap
+        }
+    )]
     pub fn new(constructor: fn(&T) -> R, pre_heap: bool) -> Self {
         let array = if pre_heap {
             Some(StaticArray::new())
@@ -57,12 +57,21 @@ impl<T: UniqueCheck<Resource = R>, R> ResourceAllocator<T, R> {
     //             }
     //     }
     // )]
+    #[requires(match self.array {
+        Some(ref array) => {
+            forall(|i: usize| (i < array.arr.len() && array.arr[i].is_some()) ==> {
+                forall(|j: usize| (j < i) ==> array.arr[j].is_some())
+            })
+            &&
+            forall(|i: usize| (i < array.arr.len() && array.arr[i].is_none()) ==> {
+                forall(|j: usize| (i <= j && j < array.arr.len()) ==> array.arr[j].is_none())
+            })
+        },
+        None => true
+    })] 
     #[ensures(result.is_ok() ==> {
-        let (new_resource, _) = peek_result_ref(&result);
-        resource_id.equal_to_resource(&new_resource)
-    })]  
-    #[ensures(result.is_ok() ==> {
-        let (_, idx) = peek_result_ref(&result);
+        let (new_resource, idx) = peek_result_ref(&result);
+        resource_id.equal_to_resource(&new_resource) &&
         match self.array {
             Some(ref array) => forall(|i: usize| ((i < array.len()) && array.lookup(i).is_some() && i != *idx) ==> {
                 (old(array.lookup(i)) == array.lookup(i)) && !peek_option(&array.lookup(i)).overlaps(&resource_id)}),
@@ -85,22 +94,24 @@ impl<T: UniqueCheck<Resource = R>, R> ResourceAllocator<T, R> {
         Ok((self.create_new_representation(resource_id), idx))
     }
 
-    
+    #[requires(
+        forall(|i: usize| (i < array.arr.len() && array.arr[i].is_some()) ==> 
+            forall(|j: usize| (j < i) ==> array.arr[j].is_some()))
+        &&
+        forall(|i: usize| (i < array.arr.len() && array.arr[i].is_none()) ==> 
+            forall(|j: usize| (i <= j && j < array.arr.len()) ==> array.arr[j].is_none())
+        )
+    )]
     #[ensures(result.is_err() ==> {
         match peek_err(&result) {
-            RepresentationCreationError::Overlap(idx) => {
-                (idx < array.len()) && array.lookup(idx).is_some() && peek_option(&array.lookup(idx)).overlaps(&resource_id)
-            },
-            RepresentationCreationError::NoSpace => {
-                forall(|i: usize| (i < array.len()) ==> array.lookup(i).is_some())
-            }
+            RepresentationCreationError::Overlap(idx) => 
+                (idx < array.len()) && array.lookup(idx).is_some() && peek_option(&array.lookup(idx)).overlaps(&resource_id),
+            RepresentationCreationError::NoSpace => forall(|i: usize| (i < array.len()) ==> array.lookup(i).is_some())
         }
     })]
     #[ensures(result.is_ok() ==> {
         let idx = peek_result(&result);
-        idx < array.len()
-        && array.lookup(idx).is_some()
-        && resource_id == peek_option(&array.lookup(idx))
+        idx < array.len() && array.lookup(idx).is_some() && resource_id == peek_option(&array.lookup(idx))
         && forall(|i: usize| ((i < array.len()) && array.lookup(i).is_some() && i != idx) ==> {
             (old(array.lookup(i)) == array.lookup(i)) && !peek_option(&array.lookup(i)).overlaps(&resource_id)
         })
@@ -123,15 +134,13 @@ impl<T: UniqueCheck<Resource = R>, R> ResourceAllocator<T, R> {
 
     #[ensures(result.is_err() ==> {
         match peek_err(&result) {
-            RepresentationCreationError::Overlap(idx) => {
-                (idx < list.len()) & list.lookup(idx).overlaps(&resource_id)
-            },
+            RepresentationCreationError::Overlap(idx) => (idx < list.len()) & list.lookup(idx).overlaps(&resource_id),
             _ => unreachable!()
         }
     })]
     #[ensures(result.is_ok() ==> {
-        forall(|i: usize| (i < old(list.len())) ==> !old(list.lookup(i)).overlaps(&resource_id))
-        && list.len() >= 1 && snap(list.lookup(0)) === resource_id
+        list.len() >= 1 && snap(list.lookup(0)) === resource_id
+        && forall(|i: usize| (i < old(list.len())) ==> !old(list.lookup(i)).overlaps(&resource_id))
     })]
     fn add_representation_info_post_heap(list: &mut List<T>, resource_id: T) -> Result<usize, RepresentationCreationError> {
         let overlap_idx = list.elem_overlaps_in_list(resource_id, 0);
@@ -152,34 +161,61 @@ impl<T: UniqueCheck<Resource = R>, R> ResourceAllocator<T, R> {
         (self.constructor)(&resource_id)
     }
 
+
+    #[requires(match self.array {
+        Some(ref array) => {
+            forall(|i: usize| (i < array.arr.len() && array.arr[i].is_some()) ==> {
+                forall(|j: usize| (j < i) ==> array.arr[j].is_some())
+            })
+            &&
+            forall(|i: usize| (i < array.arr.len() && array.arr[i].is_none()) ==> {
+                forall(|j: usize| (i <= j && j < array.arr.len()) ==> array.arr[j].is_none())
+            })
+        },
+        None => true
+    })]
+    #[ensures(result.is_ok() ==> forall(|i: usize, j: usize| (i < self.list.len() && i < j && j < self.list.len()) ==> 
+        !self.list.lookup(j).overlaps(&self.list.lookup(i)))
+    )]
+    #[ensures(match old(&self.array) { 
+        Some(ref array) => {
+            result.is_ok() ==>  forall(|i: usize| (i < self.list.len()) ==> peek_option(&array.arr[i]) === self.list.lookup(self.list.len() - 1 - i))
+        },
+        None => result.is_err()
+    })]
     pub fn switch_to_heap_allocated(&mut self) -> Result<(),()> {
-        if self.list.len() != 0 { return Err(()); }
+        if self.list.len() != 0 {
+            return Err(());
+        }
 
         match self.array {
             Some(ref array) => {
                 let mut i = 0;
-                prusti_assert!(self.list.len() == 0);
-                while i < array.len() {
-                    body_invariant!(i < array.len());
-                    body_invariant!(self.list.len() < array.len());
-                    // body_invariant!(self.list.len() == i);
-                    // body_invariant!(forall(|j: usize| ((0 <= j && j < self.list.len()) ==> self.array.arr[j].is_some())));
-                    // body_invariant!(forall(|j: usize| ((0 <= j && j < self.list.len()) ==> peek_option(&self.array.arr[j]) == self.list.lookup_copy(self.list.len() - 1 - j))));
-                    // body_invariant!(forall(|i: usize, j: usize| (0 <= i && i < self.list.len() && 0 <= j && j < self.list.len()) ==> 
-                    //     (i != j ==> !self.list.lookup_copy(i).overlaps(&self.list.lookup_copy(j))))
-                    // );
-        
-                    if let Some(resource_id) = array.lookup(i) {
-                        self.list.push(resource_id);
-                    }         
+                while i < array.arr.len() {
+                    body_invariant!(i < array.arr.len());
+                    body_invariant!(self.list.len() <= array.arr.len());
+                    body_invariant!(self.list.len() == i);
+                    body_invariant!(forall(|j: usize| ((j < self.list.len()) ==> array.arr[j].is_some())));
+                    body_invariant!(forall(|j: usize| ((j < self.list.len()) ==> peek_option(&array.arr[j]) == *self.list.lookup(self.list.len() - 1 - j))));
+                    body_invariant!(forall(|i: usize, j: usize| (i < self.list.len() && i < j && j < self.list.len()) ==> 
+                        !self.list.lookup(j).overlaps(&self.list.lookup(i)))
+                    );
+
+                    if let Some(range) = array.lookup(i) {
+                        match self.list.push_unique_with_precond(range) {
+                            Ok(()) => (),
+                            Err(_) => return Err(())
+                        }
+                    } else {
+                        break;
+                    }
+
                     i += 1;
                 }
             },
             None => return Err(())
         }
-
         self.array = None;
         Ok(())
     }
-
 }

@@ -3,17 +3,8 @@
 
 
 use prusti_contracts::*;
-
-
-// #[cfg(prusti)]
-use crate::generic::unique_trait::*;
-// #[cfg(not(prusti))]
-// use unique_trait::*;
-
-#[cfg(not(prusti))]
-use alloc::boxed::Box;
-
 use crate::{
+    generic::resource_identifier::*,
     external_spec::{trusted_option::*, trusted_result::*},
 };
 use core::{mem, marker::Copy, ops::Deref};
@@ -53,8 +44,7 @@ impl<T> List<T> {
 
     #[ensures(self.len() == old(self.len()) + 1)]
     #[ensures(snap(self.lookup(0)) === elem)]
-    #[ensures(forall(|i: usize| (i < old(self.len())) ==>
-                 old(self.lookup(i)) === self.lookup(i + 1)))]
+    #[ensures(forall(|i: usize| (i < old(self.len())) ==> old(self.lookup(i)) === self.lookup(i + 1)))]
     pub fn push(&mut self, elem: T) {
         let new_node = Box::new(Node {
             elem,
@@ -150,7 +140,7 @@ fn link_lookup<T>(link: &Link<T>, index: usize) -> &T {
     }
 }
 
-impl<T: UniqueCheck> List<T> {
+impl<T: ResourceIdentifier> List<T> {
 
     #[pure]
     #[requires(index < self.len())]
@@ -159,18 +149,13 @@ impl<T: UniqueCheck> List<T> {
         link_lookup_copy(&self.head, index)
     }
 
+    
     #[requires(index <= self.len())]
-    #[ensures(result.is_some() ==> peek_option(&result) < self.len())]
-    #[ensures(result.is_some() ==> {
-            let range = self.lookup(peek_option(&result));
-            range.overlaps(&elem)
+    #[ensures(
+        match result {
+            Some(idx) => idx < self.len() && self.lookup(idx).overlaps(&elem),
+            None => forall(|i: usize| ((index <= i && i < self.len()) ==> !self.lookup(i).overlaps(&elem)))
         }
-    )]
-    #[ensures(result.is_none() ==> 
-        forall(|i: usize| (index <= i && i < self.len()) ==> {
-            let range = self.lookup(i);
-            !range.overlaps(&elem)
-        })
     )]
     pub(crate) fn elem_overlaps_in_list(&self, elem: T, index: usize) -> Option<usize> {
         if index == self.len() {
@@ -190,21 +175,16 @@ impl<T: UniqueCheck> List<T> {
     #[requires(forall(|i: usize, j: usize| (i < self.len() && i < j && j < self.len()) ==> 
         !self.lookup(j).overlaps(&self.lookup(i)))
     )]
-    #[ensures(result.is_err() ==> peek_err(&result) < self.len())]
-    #[ensures(result.is_err() ==> {
-            let range = self.lookup(peek_err(&result));
-            range.overlaps(&elem)
+    #[ensures(
+        match result {
+            Ok(()) => {
+                self.len() == old(self.len()) + 1 && snap(self.lookup(0)) === elem
+                && forall(|i: usize| (1 <= i && i < self.len()) ==> old(self.lookup(i-1)) == self.lookup(i))
+                && forall(|i: usize| (1 <= i && i < self.len()) ==> !self.lookup(i).overlaps(&elem))
+            },
+            Err(idx) => idx < self.len() && self.lookup(idx).overlaps(&elem)
         }
     )]
-    #[ensures(result.is_ok() ==> self.len() == old(self.len()) + 1)] 
-    #[ensures(result.is_ok() ==> snap(self.lookup(0)) === elem)]
-    #[ensures(result.is_ok() ==> forall(|i: usize| (1 <= i && i < self.len()) ==> old(self.lookup(i-1)) == self.lookup(i)))]
-    #[ensures(result.is_ok() ==> {
-        forall(|i: usize| (1 <= i && i < self.len()) ==> !self.lookup(i).overlaps(&elem))
-    })]
-    #[ensures(result.is_ok() ==> {
-        forall(|i: usize| (1 <= i && i < self.len()) ==> !(self.lookup_copy(i).overlaps(&elem)))
-    })]
     #[ensures(forall(|i: usize, j: usize| (i < self.len() && i < j && j < self.len()) ==> 
         !self.lookup(j).overlaps(&self.lookup(i)))
     )]
@@ -227,7 +207,7 @@ impl<T: UniqueCheck> List<T> {
 #[pure]
 #[requires(index < link_len(link))]
 #[ensures(result == snap(link_lookup(link, index)))]
-fn link_lookup_copy<T: UniqueCheck>(link: &Link<T>, index: usize) -> T {
+fn link_lookup_copy<T: ResourceIdentifier>(link: &Link<T>, index: usize) -> T {
     match link {
         Some(node) => {
             if index == 0 {
